@@ -1,5 +1,6 @@
 """API pública de solo lectura de la Encuesta Intercensal. Uso: uvicorn eic.api:app"""
 
+import os
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Path, Query
@@ -11,6 +12,7 @@ app = FastAPI(
     title="EIC API",
     description="Datos de la Encuesta Intercensal 2015 y 2025 (INEGI). Fuente: INEGI, https://www.inegi.org.mx/inegi/terminos.html",
     version="0.1.0",
+    root_path=os.environ.get("EIC_ROOT_PATH", ""),  # prefijo público detrás del proxy, p. ej. /api
 )
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
 
