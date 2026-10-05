@@ -3,7 +3,13 @@ name = "eic"
 version = "0.1.0"
 description = "ETL, API y MCP para la Encuesta Intercensal (INEGI)"
 requires-python = ">=3.12"
-dependencies = ["duckdb>=1.1", "httpx>=0.27", "pyarrow>=17"]
+dependencies = [
+    "duckdb>=1.1",
+    "fastapi>=0.142.2",
+    "httpx>=0.27",
+    "pyarrow>=17",
+    "uvicorn>=0.54.0",
+]
 
 [build-system]
 requires = ["hatchling"]
