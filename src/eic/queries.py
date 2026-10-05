@@ -2,6 +2,8 @@
 
 import json
 import os
+import re
+import unicodedata
 from functools import lru_cache
 
 import duckdb
@@ -309,3 +311,60 @@ def evolucion(cve_ent: str = "00", tema: str | None = None) -> dict:
 
 def equivalencias() -> list[dict]:
     return _rows("SELECT * FROM equivalencia ORDER BY codigo_2015")
+
+
+# ---------- autocompletado ----------
+
+def sugerir_lugares(texto: str, limit: int = 20) -> list[str]:
+    """Etiquetas 'Nombre, Entidad (nivel)' de geografías 2025 que contienen el texto."""
+    rows = _rows(f"""
+        SELECT nombre, nom_ent, nivel FROM geografia g
+        WHERE dataset_id = 'eic2025_localidades' AND nivel IN ('entidad', 'municipio', 'localidad')
+          AND {_texto('g.nombre')}
+        ORDER BY NOT starts_with(strip_accents(lower(nombre)), strip_accents(lower(?))),
+                 nivel = 'localidad', length(nombre), nombre
+        LIMIT ?""", [texto, texto, limit])
+    return [r["nombre"] if r["nivel"] == "entidad" else f"{r['nombre']}, {r['nom_ent']} ({r['nivel']})" for r in rows]
+
+
+def sugerir(tabla: str, texto: str, limit: int = 50) -> list[str]:
+    """Nombres de entidades, temas o indicadores ('CÓDIGO — nombre') que contienen el texto."""
+    sql = {
+        "entidad": f"SELECT nombre AS v FROM entidad e WHERE cve_ent <> '00' AND {_texto('e.nombre')} ORDER BY cve_ent",
+        "tema": f"SELECT DISTINCT nombre AS v FROM tema t WHERE {_texto('t.nombre')} ORDER BY v",
+        "indicador": f"""SELECT codigo || ' — ' || nombre AS v FROM indicador i
+                         WHERE dataset_id = 'eic2025_localidades' AND ({_texto('i.codigo')} OR {_texto('i.nombre')})
+                         ORDER BY codigo""",
+    }[tabla]
+    params = [texto, texto] if tabla == "indicador" else [texto]
+    return [r["v"] for r in _rows(f"{sql} LIMIT ?", [*params, limit])]
+
+
+def sugerir_distritos(entidad: str, texto: str) -> list[str]:
+    return [r["nombre"] for r in _rows(f"""
+        SELECT g.nombre FROM geografia g JOIN entidad e USING (cve_ent)
+        WHERE g.dataset_id = 'eic2015_distritos' AND g.nivel = 'distrito'
+          AND {_texto('e.nombre')} AND {_texto('g.nombre')} ORDER BY g.cvegeo""", [entidad, texto])]
+
+
+ALIAS = {"cdmx": "Ciudad de México", "df": "Ciudad de México", "edomex": "México", "estado de mexico": "México",
+         "mexico": "Estados Unidos Mexicanos", "nacional": "Estados Unidos Mexicanos", "pais": "Estados Unidos Mexicanos"}
+
+
+def ubicar(texto: str, dataset: str = "eic2025_localidades", limit: int = 10) -> list[dict]:
+    """Resuelve 'Nombre', 'Nombre, Entidad' o 'Nombre, Entidad (nivel)' a geografías, coincidencia exacta primero."""
+    m = re.fullmatch(r"\s*(.+?)\s*(?:,\s*(.+?))?\s*(?:\((\w+)\))?\s*", texto)
+    nombre, entidad, nivel = m.groups() if m else (texto, None, None)
+    clave = unicodedata.normalize("NFKD", nombre.lower()).encode("ascii", "ignore").decode()
+    nombre = ALIAS.get(clave, nombre)
+    sql = f"SELECT g.* EXCLUDE (dataset_id) FROM geografia g WHERE g.dataset_id = ? AND {_texto('g.nombre')}"
+    params: list = [dataset, nombre]
+    if entidad:
+        sql += f" AND {_texto('g.nom_ent')}"
+        params.append(entidad)
+    if nivel:
+        sql += " AND g.nivel = ?"
+        params.append(nivel)
+    sql += """ ORDER BY strip_accents(lower(g.nombre)) <> strip_accents(lower(?)),
+                        g.nivel NOT IN ('entidad', 'municipio'), length(g.nombre) LIMIT ?"""
+    return _rows(sql, [*params, nombre, limit])
