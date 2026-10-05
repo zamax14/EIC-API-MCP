@@ -1,0 +1,30 @@
+codigo_2015,codigo_2025,tipo,nota
+IND_001,POBTOT,exacta,
+IND_003,REL_H_M,exacta,
+IND_004,MEDIANA_POBTOT,exacta,
+IND_056,PROM_OCUP,exacta,
+IND_057,PRO_OCUP_C,exacta,
+IND_058,PCN_VPH_PISOTI,exacta,
+IND_062,PCN_VPH_DRENAJ,aproximada,"El diccionario 2015 no detalla los destinos del drenaje; 2025 incluye red pública, fosa séptica y desagüe a barranca, grieta, río, lago o mar."
+IND_063,PCN_VPH_EXCSA,aproximada,2025 incluye letrina (pozo u hoyo).
+IND_064,PCN_VPH_C_ELEC,exacta,
+IND_065,PCN_VPH_INTER,exacta,
+IND_068,PCN_VPH_PC,aproximada,2015 solo cuenta computadora; 2025 incluye laptop o tablet.
+IND_069,PCN_VPH_CEL,exacta,
+IND_070,PCN_VPH_TELEF,exacta,
+IND_071,PCN_VPH_PANEL,exacta,
+IND_075,PCN_VPH_PROPIA,aproximada,2025 incluye viviendas que se están pagando.
+IND_076,PCN_VPH_ALQUI,exacta,
+IND_079,PCN_P15YM_SE,aproximada,2025 cuenta como sin instrucción a quien solo aprobó preescolar.
+IND_080,PCN_P15YM_EB,aproximada,2025 incluye estudios técnicos o comerciales con primaria o secundaria terminada.
+IND_082,PCN_P15YM_EMS,aproximada,La clasificación de estudios técnicos o comerciales puede diferir entre levantamientos.
+IND_083,PCN_P15YM_ES,aproximada,La clasificación de estudios técnicos o comerciales puede diferir entre levantamientos.
+IND_095,PCN_PEA,exacta,
+IND_098,PCN_POCUPADA,exacta,
+IND_139,PCN_PE_INAC,exacta,
+IND_113,PCN_P12YM_SOLT,exacta,
+IND_119,PCN_PDER_SS,aproximada,"Cambió el sistema de salud: 2015 incluye el Seguro Popular, eliminado en 2020."
+IND_126,PCN_P3YM_HLI,exacta,
+IND_127,PCN_P3HLINHE,exacta,
+IND_128,PCN_POB_AFRO,aproximada,La pregunta de autoadscripción cambió de redacción: 2025 pregunta por afromexicana o afrodescendiente.
+IND_141,PCN_POB_IND,exacta,

@@ -61,3 +61,12 @@ CREATE TABLE estimacion (
     nota           VARCHAR,                 -- MI: muestra insuficiente; NA: no aplica
     PRIMARY KEY (dataset_id, cvegeo, indicador)
 );
+
+-- Pares curados de indicadores comparables entre 2015 y 2025 (src/eic/equivalencias.csv).
+CREATE TABLE equivalencia (
+    codigo_2015 VARCHAR NOT NULL,
+    codigo_2025 VARCHAR NOT NULL,
+    tipo        VARCHAR NOT NULL CHECK (tipo IN ('exacta', 'aproximada')),
+    nota        VARCHAR,                -- por qué es aproximada
+    PRIMARY KEY (codigo_2015, codigo_2025)
+);

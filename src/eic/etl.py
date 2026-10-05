@@ -21,6 +21,7 @@ import pyarrow as pa
 DATA = Path("data")
 RAW = DATA / "raw"
 SCHEMA = Path(__file__).with_name("schema.sql")
+EQUIVALENCIAS = Path(__file__).with_name("equivalencias.csv")  # pares curados 2015 ↔ 2025
 
 
 # ---------- extract ----------
@@ -140,6 +141,28 @@ def parse_2025(z: zipfile.ZipFile, ds: str) -> dict:
 
 # ---------- transform: EIC 2015, distritos electorales federales ----------
 
+# El diccionario 2015 no agrupa por tema: se asignan por rango de código con los mismos nombres de 2025,
+# para poder filtrar y comparar por tema entre levantamientos.
+TEMAS_2015 = {
+    "POBLACIÓN": [(1, 7), (47, 51), (800, 825)],
+    "FECUNDIDAD": [(53, 53)],
+    "MORTALIDAD": [(54, 54)],
+    "VIVIENDA": [(55, 78), (138, 138)],
+    "EDUCACIÓN": [(79, 94)],
+    "CARACTERÍSTICAS ECONÓMICAS": [(95, 108), (139, 139), (812, 816)],
+    "SITUACIÓN CONYUGAL": [(112, 117)],
+    "SERVICIOS DE SALUD": [(119, 125)],
+    "ETNICIDAD": [(126, 128), (141, 141)],
+}
+
+
+def tema_2015(codigo: str) -> int:
+    n = int(codigo.removeprefix("IND_"))
+    for tid, rangos in enumerate(TEMAS_2015.values(), 1):
+        if any(a <= n <= b for a, b in rangos):
+            return tid
+    raise ValueError(f"{codigo} sin tema en TEMAS_2015")
+
 def parse_2015(z: zipfile.ZipFile, ds: str) -> dict:
     cat = {(r["cve_ent"], r["cve_distrito"]): r
            for r in csv.DictReader(io.StringIO(read_member(z, "cat_distritos.csv", "utf-8-sig")))}
@@ -173,11 +196,12 @@ def parse_2015(z: zipfile.ZipFile, ds: str) -> dict:
                             nota="MI" if valor is None and mi else None))
 
     inds = [dict(dataset_id=ds, codigo=x["indicador"].upper(), nombre=x["descripcion"], descripcion=x["descripcion"],
-                 tema_id=None, mnemonico_alt=x["mnemonico"])
+                 tema_id=tema_2015(x["indicador"].upper()), mnemonico_alt=x["mnemonico"])
             for x in csv.DictReader(io.StringIO(read_member(z, "fd_eiege_eic_2015.csv", "utf-8-sig")))
             if x["indicador"].upper() in indicadores]
 
-    return dict(geografia=geos, estimacion=est, indicador=inds, tema=[],
+    return dict(geografia=geos, estimacion=est, indicador=inds,
+                tema=[dict(dataset_id=ds, id=i, nombre=n) for i, n in enumerate(TEMAS_2015, 1)],
                 metadata=parse_metadata(read_member(z, "metadatos_eiege_eic_2015.txt", "utf-8-sig")))
 
 
@@ -228,6 +252,16 @@ def run(db: Path, offline: bool) -> None:
         entidades |= {g["cve_ent"]: g["nom_ent"] for g in data["geografia"] if g["nivel"] in ("nacional", "entidad")}
 
     insert(con, "entidad", [dict(cve_ent=k, nombre=v) for k, v in sorted(entidades.items())])
+
+    equivalencias = [r | {"nota": r["nota"] or None} for r in csv.DictReader(EQUIVALENCIAS.open(encoding="utf-8"))]
+    insert(con, "equivalencia", equivalencias)
+    huerfanas = con.execute("""
+        SELECT codigo_2015, codigo_2025 FROM equivalencia q
+        WHERE NOT EXISTS (SELECT 1 FROM indicador WHERE dataset_id = 'eic2015_distritos' AND codigo = q.codigo_2015)
+           OR NOT EXISTS (SELECT 1 FROM indicador WHERE dataset_id = 'eic2025_localidades' AND codigo = q.codigo_2025)
+    """).fetchall()
+    assert not huerfanas, f"equivalencias.csv apunta a códigos inexistentes: {huerfanas}"
+    print(f"  equivalencia: {len(equivalencias)}")
 
     parquet = db.parent / "parquet"
     parquet.mkdir(exist_ok=True)
