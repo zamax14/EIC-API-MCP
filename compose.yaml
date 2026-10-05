@@ -1,0 +1,43 @@
+# docker compose up -d     → corre el ETL una vez, luego levanta API y nginx
+# docker compose run --rm etl   → recarga los datos (la API toma la base nueva sin reiniciar)
+services:
+  etl:
+    build: .
+    command: ["python", "-m", "eic.etl"]
+    volumes:
+      - eic-data:/app/data
+    restart: "no"
+
+  api:
+    build: .
+    depends_on:
+      etl:
+        condition: service_completed_successfully
+    environment:
+      EIC_DB_MEMORY: ${EIC_DB_MEMORY:-384MB}
+      EIC_DB_THREADS: ${EIC_DB_THREADS:-2}
+    volumes:
+      - eic-data:/app/data:ro
+    mem_limit: 1g
+    cpus: 2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/datasets')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${EIC_PORT:-8080}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    mem_limit: 256m
+    restart: unless-stopped
+
+volumes:
+  eic-data:
