@@ -10,7 +10,10 @@ MAX_LIMIT = 10_000
 
 @lru_cache(maxsize=1)
 def _open(path: str, mtime_ns: int) -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(path, read_only=True)
+    # Topes por proceso para que una consulta pesada no se coma la máquina.
+    config = {"memory_limit": os.environ.get("EIC_DB_MEMORY", "512MB"),
+              "threads": int(os.environ.get("EIC_DB_THREADS", "2"))}
+    return duckdb.connect(path, read_only=True, config=config)
 
 
 def _con() -> duckdb.DuckDBPyConnection:
