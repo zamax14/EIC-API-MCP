@@ -6,6 +6,31 @@ from functools import lru_cache
 import duckdb
 
 MAX_LIMIT = 10_000
+MAX_INDICADORES = 100  # tope de indicadores por perfil o comparación (el tema más grande tiene 82)
+
+# Criterio INEGI para estimaciones por muestreo, según el coeficiente de variación.
+PRECISION = """CASE WHEN e.coef_var IS NULL THEN NULL WHEN e.coef_var < 15 THEN 'alta'
+                    WHEN e.coef_var <= 30 THEN 'moderada' ELSE 'baja' END"""
+
+# Indicadores por defecto de un perfil: un vistazo a cada tema.
+DESTACADOS = {
+    "eic2025_localidades": [
+        "POBTOT", "REL_H_M", "MEDIANA_POBTOT", "TGF", "PCN_POB_IND", "PCN_POB_AFRO", "PCN_PNACOE",
+        "GRAPROES", "PCN_P15YM_AN", "PCN_P15YM_ES", "PCN_PEA", "PCN_PDESOCUP", "PCN_PSINDER",
+        "PROM_OCUP", "PCN_VPH_DRENAJ", "PCN_VPH_INTER", "PCN_HOG_ALIM_N", "PCN_HOG_GOB", "PCN_DESP_INSEG",
+    ],
+    "eic2015_distritos": [
+        "IND_001", "IND_003", "IND_004", "IND_005", "IND_141", "IND_128", "IND_126", "IND_079", "IND_083",
+        "IND_095", "IND_098", "IND_119", "IND_056", "IND_058", "IND_062", "IND_065",
+    ],
+}
+
+# Carencias sociales que capta la EIC 2025 (no es una medición oficial de pobreza).
+VULNERABILIDAD = [
+    "PCN_PSINDER", "PCN_P15YM_SE", "PCN_P15YM_AN", "PCN_P6A14_NOA", "PCN_HOG_ALIM_N", "PCN_ALIM_ADL2",
+    "PCN_ALIM_MEN1", "PCN_VPH_PISOTI", "PCN_VPH_1CUART", "PCN_VPH_AGUADV", "PCN_VPH_DRENAJ", "PCN_VPH_INTER",
+    "PCN_PDESOCUP", "PCN_HOG_GOB", "PCN_DESP_INSEG", "PCN_DESP_CATAS",
+]
 
 
 @lru_cache(maxsize=1)
@@ -42,6 +67,18 @@ def _page(sql: str, params: list, order: str, limit: int, offset: int) -> dict:
 def _texto(columna: str) -> str:
     """Filtro de búsqueda sin distinguir mayúsculas ni acentos."""
     return f"strip_accents(lower({columna})) LIKE '%' || strip_accents(lower(?)) || '%'"
+
+
+def _tema(ds: str, tema: int | str | None) -> list[int] | None:
+    """Acepta el id del tema o parte de su nombre (sin acentos ni mayúsculas)."""
+    if tema is None or tema == "":
+        return None
+    if isinstance(tema, int) or str(tema).isdigit():
+        return [int(tema)]
+    ids = [r["id"] for r in _rows(f"SELECT id FROM tema t WHERE dataset_id = ? AND {_texto('t.nombre')}", [ds, tema])]
+    if not ids:
+        raise LookupError(f"tema no encontrado en {ds}: {tema}")
+    return ids
 
 
 def datasets() -> list[dict]:
@@ -107,9 +144,163 @@ def datos(ds: str, indicadores: list[str], cvegeo: list[str] | None = None, nive
     filtro, params = _filtro_geo(nivel, cve_ent, cvegeo)
     sql = f"""
         SELECT e.cvegeo, g.nombre, g.nivel, g.nom_ent, e.indicador, i.nombre AS indicador_nombre,
-               e.valor, e.error_estandar, e.lim_inf, e.lim_sup, e.coef_var, e.nota
+               e.valor, e.error_estandar, e.lim_inf, e.lim_sup, e.coef_var, {PRECISION} AS precision, e.nota
         FROM estimacion e
         JOIN geografia g USING (dataset_id, cvegeo)
         JOIN indicador i ON i.dataset_id = e.dataset_id AND i.codigo = e.indicador
         WHERE e.dataset_id = ? AND e.indicador IN (SELECT unnest(?::VARCHAR[])){filtro}"""
     return _page(sql, [ds, [i.upper() for i in indicadores], *params], "cvegeo, indicador", limit, offset)
+
+
+# ---------- análisis ----------
+
+def _geo(ds: str, cvegeo: str) -> dict:
+    rows = _rows("SELECT * EXCLUDE (dataset_id) FROM geografia WHERE dataset_id = ? AND cvegeo = ?", [ds, cvegeo])
+    if not rows:
+        raise LookupError(f"geografía no encontrada en {ds}: {cvegeo}")
+    return rows[0]
+
+
+def _seleccion(ds: str, indicadores: list[str] | None, tema: int | str | None,
+               por_defecto: list[str] | None = None) -> list[dict]:
+    """Metadatos de los indicadores pedidos, por códigos o por tema; si no hay ninguno, `por_defecto`."""
+    sql = """SELECT i.codigo, i.nombre, t.nombre AS tema FROM indicador i
+             LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id WHERE i.dataset_id = ?"""
+    codigos = [c.upper() for c in indicadores] if indicadores else None
+    tema_ids = _tema(ds, tema)
+    if not codigos and not tema_ids:
+        codigos = por_defecto or DESTACADOS.get(ds, [])
+    params: list = [ds]
+    if codigos:
+        sql += " AND i.codigo IN (SELECT unnest(?::VARCHAR[]))"
+        params.append(codigos)
+    if tema_ids:
+        sql += " AND i.tema_id IN (SELECT unnest(?::INTEGER[]))"
+        params.append(tema_ids)
+    meta = {r["codigo"]: r for r in _rows(sql, params)}
+    orden = [c for c in codigos if c in meta] if codigos else sorted(meta)  # respeta el orden pedido
+    return [meta[c] for c in orden][:MAX_INDICADORES]
+
+
+def _celdas(ds: str, cvegeos: list[str], codigos: list[str]) -> dict[tuple[str, str], dict]:
+    rows = _rows(f"""
+        SELECT e.cvegeo, e.indicador, e.valor, e.coef_var, {PRECISION} AS precision, e.nota
+        FROM estimacion e WHERE e.dataset_id = ?
+          AND e.cvegeo IN (SELECT unnest(?::VARCHAR[])) AND e.indicador IN (SELECT unnest(?::VARCHAR[]))""",
+                 [ds, cvegeos, codigos])
+    return {(r.pop("cvegeo"), r.pop("indicador")): r for r in rows}
+
+
+def ranking(ds: str, indicador: str, nivel: str, cve_ent: str | None = None, orden: str = "desc",
+            n: int = 10, excluir_baja_precision: bool = False) -> dict:
+    """Mayores (desc) o menores (asc) valores de un indicador entre las geografías de un nivel."""
+    meta = _seleccion(ds, [indicador], None)
+    if not meta:
+        raise LookupError(f"indicador no encontrado en {ds}: {indicador}")
+    filtro, params = _filtro_geo(nivel, cve_ent, None)
+    if excluir_baja_precision:
+        filtro += " AND e.coef_var <= 30"
+    direccion = "ASC" if orden == "asc" else "DESC"
+    base = f"""FROM estimacion e JOIN geografia g USING (dataset_id, cvegeo)
+               WHERE e.dataset_id = ? AND e.indicador = ? AND e.valor IS NOT NULL{filtro}"""
+    params = [ds, meta[0]["codigo"], *params]
+    items = _rows(f"""
+        SELECT row_number() OVER (ORDER BY e.valor {direccion}, e.cvegeo) AS posicion, e.cvegeo, g.nombre,
+               g.nom_ent, g.nom_mun, g.atributos, e.valor, e.coef_var, {PRECISION} AS precision
+        {base} ORDER BY e.valor {direccion}, e.cvegeo LIMIT ?""", [*params, max(1, min(n, 100))])
+    total = _rows(f"SELECT count(*) AS n {base}", params)[0]["n"]
+    refs = _rows(f"""
+        SELECT g.nivel, g.nombre, e.valor FROM estimacion e JOIN geografia g USING (dataset_id, cvegeo)
+        WHERE e.dataset_id = ? AND e.indicador = ?
+          AND (g.nivel = 'nacional' OR (g.nivel = 'entidad' AND g.cve_ent = ?))""", [ds, meta[0]["codigo"], cve_ent])
+    return {"indicador": meta[0], "nivel": nivel, "orden": "asc" if direccion == "ASC" else "desc",
+            "unidades_con_dato": total, "referencias": refs, "items": items}
+
+
+def perfil(ds: str, cvegeo: str, indicadores: list[str] | None = None, tema: int | str | None = None) -> dict:
+    """Indicadores de un lugar junto a los de su entidad y el total nacional."""
+    lugar = _geo(ds, cvegeo)
+    refs = {"lugar": cvegeo}
+    for r in _rows("""SELECT nivel, cvegeo FROM geografia WHERE dataset_id = ?
+                      AND (nivel = 'nacional' OR (nivel = 'entidad' AND cve_ent = ?))
+                      ORDER BY nivel = 'nacional'""", [ds, lugar["cve_ent"]]):
+        if r["cvegeo"] != cvegeo:
+            refs[r["nivel"]] = r["cvegeo"]
+    meta = _seleccion(ds, indicadores, tema)
+    celdas = _celdas(ds, list(refs.values()), [m["codigo"] for m in meta])
+    return {
+        "lugar": lugar,
+        "comparado_con": {rol: _geo(ds, g)["nombre"] for rol, g in refs.items() if rol != "lugar"},
+        "indicadores": [m | {rol: celdas.get((g, m["codigo"])) for rol, g in refs.items()} for m in meta],
+    }
+
+
+def comparar(ds: str, cvegeos: list[str], indicadores: list[str] | None = None, tema: int | str | None = None) -> dict:
+    """Tabla indicador × lugar."""
+    lugares = [_geo(ds, g) for g in dict.fromkeys(cvegeos)][:10]
+    meta = _seleccion(ds, indicadores, tema)
+    celdas = _celdas(ds, [l["cvegeo"] for l in lugares], [m["codigo"] for m in meta])
+    return {
+        "lugares": [{k: l[k] for k in ("cvegeo", "nombre", "nivel", "nom_ent")} for l in lugares],
+        "indicadores": [m | {"valores": {l["cvegeo"]: celdas.get((l["cvegeo"], m["codigo"])) for l in lugares}}
+                        for m in meta],
+    }
+
+
+def brecha_genero(ds: str, cvegeo: str, tema: int | str | None = None) -> dict:
+    """Pares de indicadores mujeres (_F) / hombres (_M) de un lugar, con su total si existe."""
+    lugar = _geo(ds, cvegeo)
+    sql = """SELECT i.codigo, i.nombre, t.nombre AS tema FROM indicador i
+             LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id WHERE i.dataset_id = ?"""
+    params: list = [ds]
+    if tema_ids := _tema(ds, tema):
+        sql += " AND i.tema_id IN (SELECT unnest(?::INTEGER[]))"
+        params.append(tema_ids)
+    todos = {r["codigo"]: r for r in _rows(sql, params)}
+    bases = sorted(c[:-2] for c in todos if c.endswith("_F") and c[:-2] + "_M" in todos)
+    codigos = [c for b in bases for c in (b, b + "_F", b + "_M") if c in todos]
+    celdas = _celdas(ds, [cvegeo], codigos)
+    items = []
+    for b in bases:
+        f, m = celdas.get((cvegeo, b + "_F")), celdas.get((cvegeo, b + "_M"))
+        items.append({
+            "base": b, "tema": todos[b + "_F"]["tema"],
+            "mujeres": todos[b + "_F"]["nombre"], "hombres": todos[b + "_M"]["nombre"],
+            "valor_mujeres": f, "valor_hombres": m, "total": celdas.get((cvegeo, b)),
+            "diferencia_mujeres_menos_hombres": round(f["valor"] - m["valor"], 2)
+            if f and m and f["valor"] is not None and m["valor"] is not None else None,
+        })
+    return {"lugar": lugar, "items": items}
+
+
+def evolucion(cve_ent: str = "00", tema: str | None = None) -> dict:
+    """Indicadores equivalentes 2015 → 2025 para el país (00) o una entidad."""
+    sql = f"""
+        WITH v AS (
+            SELECT e.dataset_id, e.indicador, e.valor, e.lim_inf, e.lim_sup, e.coef_var, {PRECISION} AS precision
+            FROM estimacion e JOIN geografia g USING (dataset_id, cvegeo)
+            WHERE g.cve_ent = ? AND g.nivel IN ('nacional', 'entidad'))
+        SELECT q.codigo_2015, q.codigo_2025, i.nombre, t.nombre AS tema, q.tipo, q.nota,
+               round(a.valor, 2) AS valor_2015, round(a.coef_var, 2) AS cv_2015, a.precision AS precision_2015,
+               b.valor AS valor_2025, b.coef_var AS cv_2025, b.precision AS precision_2025,
+               round(b.valor - a.valor, 2) AS cambio,
+               round((b.valor - a.valor) / nullif(a.valor, 0) * 100, 1) AS cambio_relativo_pct,
+               -- con intervalos al 90 % que no se traslapan, la diferencia es estadísticamente clara
+               NOT (a.lim_sup < b.lim_inf OR b.lim_sup < a.lim_inf) AS intervalos_se_traslapan
+        FROM equivalencia q
+        JOIN indicador i ON i.dataset_id = 'eic2025_localidades' AND i.codigo = q.codigo_2025
+        LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id
+        LEFT JOIN v a ON a.dataset_id = 'eic2015_distritos' AND a.indicador = q.codigo_2015
+        LEFT JOIN v b ON b.dataset_id = 'eic2025_localidades' AND b.indicador = q.codigo_2025"""
+    params: list = [cve_ent]
+    if tema:
+        sql += f" WHERE {_texto('t.nombre')}"
+        params.append(tema)
+    nombre = _rows("SELECT nombre FROM entidad WHERE cve_ent = ?", [cve_ent])
+    if not nombre:
+        raise LookupError(f"entidad no encontrada: {cve_ent}")
+    return {"entidad": nombre[0]["nombre"], "cve_ent": cve_ent, "items": _rows(sql + " ORDER BY tema, q.codigo_2025", params)}
+
+
+def equivalencias() -> list[dict]:
+    return _rows("SELECT * FROM equivalencia ORDER BY codigo_2015")
