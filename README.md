@@ -68,3 +68,24 @@ Protección contra abuso (`deploy/nginx.conf`); la API no se publica directament
 | Contenedor | api: 1 GB / 2 CPU; nginx: 256 MB |
 
 Variables: `EIC_PORT` (8081, solo en 127.0.0.1) y `EIC_DB_MEMORY`/`EIC_DB_THREADS`. La API se sirve bajo `/api` (`EIC_ROOT_PATH`) y nginx toma la IP real del cliente desde `CF-Connecting-IP` (Cloudflare Tunnel).
+
+## MCP
+
+Servidor MCP (FastMCP, streamable HTTP sin sesión) en `https://eic.datzin.com.mx/mcp`, con tools de solo lectura:
+
+| Tool | Para qué |
+|---|---|
+| `listar_datasets` | datasets con sus temas |
+| `buscar_indicadores` | códigos de indicador por texto o tema |
+| `buscar_geografias` | claves `cvegeo` por nombre, nivel o entidad |
+| `obtener_datos` | estimaciones con EE, límites al 90 %, CV, `precision` (criterio INEGI) y nota MI/NA; máximo 500 filas por llamada |
+
+Para conectarlo desde un cliente:
+
+```sh
+claude mcp add --transport http eic https://eic.datzin.com.mx/mcp   # Claude Code
+uv run python -m eic.mcp_server                                     # stdio local (usa data/eic.duckdb)
+uv run python tests/test_mcp.py
+```
+
+nginx le aplica los mismos límites por IP que a la API (sin caché, cuerpo de 64 KB como máximo).
