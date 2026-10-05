@@ -9,6 +9,7 @@ Un ETL descarga los paquetes de datos abiertos directamente de INEGI y los norma
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-FastMCP-8A2BE2)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/licencia-MIT-green)](LICENSE)
 
 ## 🌐 Ya está en línea, úsalo sin montar nada
 
@@ -305,6 +306,8 @@ uv run python tests/test_etl.py && uv run python tests/test_api.py && uv run pyt
 
 Para agregar otro paquete de datos abiertos de INEGI, añade una entrada a `SOURCES` en [`src/eic/etl.py`](src/eic/etl.py) con su URL y su parser.
 
-## 📄 Fuente y créditos
+## 📄 Licencia, fuente y créditos
+
+Código bajo licencia [MIT](LICENSE).
 
 Datos: **INEGI, Encuesta Intercensal 2015 y 2025**, usados conforme a los [términos de libre uso de la información del INEGI](https://www.inegi.org.mx/inegi/terminos.html). Este proyecto no está afiliado al INEGI. Si citas los datos, menciona a INEGI como fuente.

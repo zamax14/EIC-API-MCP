@@ -3,6 +3,7 @@ name = "eic"
 version = "0.1.0"
 description = "ETL, API y MCP para la Encuesta Intercensal (INEGI)"
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = [
     "duckdb>=1.1",
     "fastapi>=0.142.2",
