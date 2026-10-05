@@ -43,3 +43,28 @@ uv run python tests/test_api.py
 Ejemplo: `/datasets/eic2025_localidades/datos?indicador=POBTOT,POBFEM&nivel=entidad`
 
 La API abre la base en modo solo lectura y la vuelve a abrir sola cuando el ETL la reemplaza. `EIC_DB` cambia la ruta. DuckDB no deja abrirla mientras otro proceso, como DBeaver, la tenga abierta en modo escritura. El rate limiting va en el proxy (Caddy o nginx).
+
+## Despliegue con Docker
+
+```sh
+docker compose up -d --build        # 1) etl corre una vez  2) api arranca si el etl terminó bien  3) nginx expone :8080
+docker compose run --rm etl         # recargar datos; la API toma la base nueva sin reiniciar
+```
+
+Para recargar cada semana desde el cron del servidor:
+
+```cron
+0 4 * * 1  cd /ruta/EIC-API-MCP && docker compose run --rm etl >> /var/log/eic-etl.log 2>&1
+```
+
+Protección contra abuso (`deploy/nginx.conf`); la API no se publica directamente:
+
+| Capa | Límite |
+|---|---|
+| nginx | 5 req/s por IP con ráfaga de 20, 10 conexiones simultáneas por IP; el exceso recibe 429 |
+| nginx | caché de 10 min para las respuestas (los datos solo cambian con el ETL), solo GET/HEAD y body de 1 KB como máximo |
+| API | 64 peticiones en curso por worker (2 workers), páginas de 10 000 filas como máximo, parámetros validados |
+| DuckDB | `EIC_DB_MEMORY` (384MB) y `EIC_DB_THREADS` (2) por proceso |
+| Contenedor | api: 1 GB / 2 CPU; nginx: 256 MB |
+
+Variables: `EIC_PORT` (8080), `EIC_DB_MEMORY` y `EIC_DB_THREADS`. Si delante hay otro proxy o una CDN, configura `real_ip` en `deploy/nginx.conf`; si no, todas las peticiones cuentan como una sola IP.
