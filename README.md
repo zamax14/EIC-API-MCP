@@ -47,7 +47,7 @@ La API abre la base en modo solo lectura y la vuelve a abrir sola cuando el ETL 
 ## Despliegue con Docker
 
 ```sh
-docker compose up -d --build        # 1) etl corre una vez  2) api arranca si el etl terminó bien  3) nginx expone :8080
+docker compose up -d --build        # 1) etl corre una vez  2) api arranca si el etl terminó bien  3) nginx en 127.0.0.1:8081, bajo /api
 docker compose run --rm etl         # recargar datos; la API toma la base nueva sin reiniciar
 ```
 
@@ -67,4 +67,4 @@ Protección contra abuso (`deploy/nginx.conf`); la API no se publica directament
 | DuckDB | `EIC_DB_MEMORY` (384MB) y `EIC_DB_THREADS` (2) por proceso |
 | Contenedor | api: 1 GB / 2 CPU; nginx: 256 MB |
 
-Variables: `EIC_PORT` (8080), `EIC_DB_MEMORY` y `EIC_DB_THREADS`. Si delante hay otro proxy o una CDN, configura `real_ip` en `deploy/nginx.conf`; si no, todas las peticiones cuentan como una sola IP.
+Variables: `EIC_PORT` (8081, solo en 127.0.0.1) y `EIC_DB_MEMORY`/`EIC_DB_THREADS`. La API se sirve bajo `/api` (`EIC_ROOT_PATH`) y nginx toma la IP real del cliente desde `CF-Connecting-IP` (Cloudflare Tunnel).
