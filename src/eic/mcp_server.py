@@ -93,4 +93,4 @@ def obtener_datos(
 app = mcp.http_app(path="/mcp", stateless_http=True, json_response=True)
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(show_banner=False)
