@@ -1,5 +1,6 @@
 """Consultas de solo lectura sobre data/eic.duckdb, compartidas por la API y el MCP."""
 
+import json
 import os
 from functools import lru_cache
 
@@ -51,7 +52,11 @@ def _rows(sql: str, params: list | None = None) -> list[dict]:
     cur = _con().cursor()  # un cursor por llamada: la conexión no es segura entre hilos
     rel = cur.execute(sql, params or [])
     cols = [d[0] for d in rel.description]
-    return [dict(zip(cols, r)) for r in rel.fetchall()]
+    rows = [dict(zip(cols, r)) for r in rel.fetchall()]
+    if "atributos" in cols:  # DuckDB devuelve JSON como texto
+        for r in rows:
+            r["atributos"] = json.loads(r["atributos"]) if r["atributos"] else None
+    return rows
 
 
 def _page(sql: str, params: list, order: str, limit: int, offset: int) -> dict:
