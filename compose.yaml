@@ -1,4 +1,4 @@
-# docker compose up -d     → corre el ETL una vez, luego levanta API y nginx
+# docker compose up -d     → corre el ETL una vez, luego levanta API, MCP y nginx
 # docker compose run --rm etl   → recarga los datos (la API toma la base nueva sin reiniciar)
 services:
   etl:
@@ -28,10 +28,33 @@ services:
       timeout: 5s
       retries: 3
 
+  mcp:
+    build: .
+    command: ["uvicorn", "eic.mcp_server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2",
+              "--limit-concurrency", "32", "--timeout-keep-alive", "5", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    depends_on:
+      etl:
+        condition: service_completed_successfully
+    environment:
+      EIC_DB_MEMORY: ${EIC_DB_MEMORY:-384MB}
+      EIC_DB_THREADS: ${EIC_DB_THREADS:-2}
+    volumes:
+      - eic-data:/app/data:ro
+    mem_limit: 1g
+    cpus: 2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   nginx:
     image: nginx:1.29-alpine
     depends_on:
       api:
+        condition: service_healthy
+      mcp:
         condition: service_healthy
     ports:
       - "127.0.0.1:${EIC_PORT:-8081}:80"   # solo local: el acceso público entra por Cloudflare Tunnel
