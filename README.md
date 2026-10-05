@@ -23,3 +23,23 @@ Para correrlo automáticamente cada semana con cron:
 ```cron
 0 4 * * 1  cd /ruta/EIC-API-MCP && uv run python -m eic.etl >> data/etl.log 2>&1
 ```
+
+## API
+
+```sh
+uv run uvicorn eic.api:app --host 0.0.0.0 --port 8000   # docs en /docs
+uv run python tests/test_api.py
+```
+
+| Ruta (GET) | Parámetros |
+|---|---|
+| `/datasets` | |
+| `/entidades` | |
+| `/datasets/{id}/temas` | |
+| `/datasets/{id}/indicadores` | `tema`, `q` (sin acentos ni mayúsculas) |
+| `/datasets/{id}/geografias` | `nivel`, `cve_ent`, `q`, `limit`, `offset` |
+| `/datasets/{id}/datos` | `indicador` (obligatorio, separados por coma), `cvegeo`, `nivel`, `cve_ent`, `limit` (≤ 10 000), `offset` |
+
+Ejemplo: `/datasets/eic2025_localidades/datos?indicador=POBTOT,POBFEM&nivel=entidad`
+
+La API abre la base en modo solo lectura y la vuelve a abrir sola cuando el ETL la reemplaza. `EIC_DB` cambia la ruta. DuckDB no deja abrirla mientras otro proceso, como DBeaver, la tenga abierta en modo escritura. El rate limiting va en el proxy (Caddy o nginx).
