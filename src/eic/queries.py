@@ -286,14 +286,28 @@ def brecha_genero(ds: str, cvegeo: str, tema: int | str | None = None) -> dict:
     return {"lugar": lugar, "items": items}
 
 
+LECTURA_EVOLUCION = (
+    "Solo los indicadores de `items` son comparables entre 2015 y 2025; no compares ningún otro aunque tenga un "
+    "nombre parecido. Los de `no_comparables` cambiaron de definición o de universo: no reportes su cambio. "
+    "Si un indicador trae `advertencia`, menciónala junto a la cifra. Un cambio es estadísticamente claro solo "
+    "si `intervalos_se_traslapan` es false."
+)
+
+
 def evolucion(cve_ent: str = "00", tema: str | None = None) -> dict:
-    """Indicadores equivalentes 2015 → 2025 para el país (00) o una entidad."""
-    sql = f"""
+    """Indicadores equivalentes 2015 → 2025 para el país (00) o una entidad, y los que no se deben comparar."""
+    nombre = _rows("SELECT nombre FROM entidad WHERE cve_ent = ?", [cve_ent])
+    if not nombre:
+        raise LookupError(f"entidad no encontrada: {cve_ent}")
+    filtro_tema = f" AND {_texto('t.nombre')}" if tema else ""
+    extra = [tema] if tema else []
+    items = _rows(f"""
         WITH v AS (
             SELECT e.dataset_id, e.indicador, e.valor, e.lim_inf, e.lim_sup, e.coef_var, {PRECISION} AS precision
             FROM estimacion e JOIN geografia g USING (dataset_id, cvegeo)
             WHERE g.cve_ent = ? AND g.nivel IN ('nacional', 'entidad'))
-        SELECT q.codigo_2015, q.codigo_2025, i.nombre, t.nombre AS tema, q.tipo, q.nota,
+        SELECT q.codigo_2015, q.codigo_2025, i.nombre, t.nombre AS tema, q.tipo,
+               CASE WHEN q.tipo = 'aproximada' THEN q.nota END AS advertencia,
                round(a.valor, 2) AS valor_2015, round(a.coef_var, 2) AS cv_2015, a.precision AS precision_2015,
                b.valor AS valor_2025, b.coef_var AS cv_2025, b.precision AS precision_2025,
                round(b.valor - a.valor, 2) AS cambio,
@@ -304,15 +318,17 @@ def evolucion(cve_ent: str = "00", tema: str | None = None) -> dict:
         JOIN indicador i ON i.dataset_id = 'eic2025_localidades' AND i.codigo = q.codigo_2025
         LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id
         LEFT JOIN v a ON a.dataset_id = 'eic2015_distritos' AND a.indicador = q.codigo_2015
-        LEFT JOIN v b ON b.dataset_id = 'eic2025_localidades' AND b.indicador = q.codigo_2025"""
-    params: list = [cve_ent]
-    if tema:
-        sql += f" WHERE {_texto('t.nombre')}"
-        params.append(tema)
-    nombre = _rows("SELECT nombre FROM entidad WHERE cve_ent = ?", [cve_ent])
-    if not nombre:
-        raise LookupError(f"entidad no encontrada: {cve_ent}")
-    return {"entidad": nombre[0]["nombre"], "cve_ent": cve_ent, "items": _rows(sql + " ORDER BY tema, q.codigo_2025", params)}
+        LEFT JOIN v b ON b.dataset_id = 'eic2025_localidades' AND b.indicador = q.codigo_2025
+        WHERE q.tipo <> 'no_comparable'{filtro_tema}
+        ORDER BY tema, q.codigo_2025""", [cve_ent, *extra])
+    no_comparables = _rows(f"""
+        SELECT q.codigo_2015, q.codigo_2025, i.nombre, t.nombre AS tema, q.nota AS razon
+        FROM equivalencia q
+        JOIN indicador i ON i.dataset_id = 'eic2025_localidades' AND i.codigo = q.codigo_2025
+        LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id
+        WHERE q.tipo = 'no_comparable'{filtro_tema} ORDER BY q.codigo_2025""", extra)
+    return {"entidad": nombre[0]["nombre"], "cve_ent": cve_ent, "como_leer": LECTURA_EVOLUCION,
+            "items": items, "no_comparables": no_comparables}
 
 
 def equivalencias() -> list[dict]:

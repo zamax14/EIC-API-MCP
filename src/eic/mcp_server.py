@@ -38,8 +38,9 @@ variación (CV). Criterio INEGI de precisión: CV < 15 **alta**; 15–30 **moder
 
 ## Comparar 2015 con 2025
 Solo a nivel nacional o por entidad y solo con los pares de `eic://equivalencias` (tool `evolucion_2015_2025`).
-Los pares "aproximada" cambiaron de definición: menciona la nota. Si los intervalos al 90 % no se traslapan,
-la diferencia es estadísticamente clara.
+Nunca emparejes indicadores por tu cuenta: varios con nombre parecido cambiaron de definición (los
+`no_comparable`, como agua entubada). Los pares "aproximada" traen una advertencia que hay que mencionar.
+Si los intervalos al 90 % no se traslapan, la diferencia es estadísticamente clara.
 
 ## Ojo con los porcentajes por sexo
 Algunos indicadores _F/_M son tasas dentro de cada sexo (p. ej. % de mujeres analfabetas) y otros son la
@@ -61,8 +62,14 @@ Flujo recomendado:
 3. buscar_indicadores y obtener_datos para lo que no cubran las anteriores.
 
 Son estimaciones por muestreo: reporta la precisión (CV < 15 alta, 15–30 moderada, > 30 baja) y no
-presentes como sólidas las de precisión baja o con nota MI (muestra insuficiente). 2015 y 2025 solo se
-comparan con evolucion_2015_2025. Cita siempre: "Fuente: INEGI, Encuesta Intercensal". Detalles en eic://guia.""",
+presentes como sólidas las de precisión baja o con nota MI (muestra insuficiente).
+
+Comparar 2015 con 2025: usa SOLO evolucion_2015_2025 y solo los indicadores que devuelve en `items`. Nunca
+armes pares por tu cuenta con obtener_datos, aunque los nombres se parezcan: varios cambiaron de definición
+(p. ej. agua entubada). Menciona la `advertencia` de cada indicador aproximado (p. ej. la afiliación a salud
+de 2015 incluía el Seguro Popular).
+
+Cita siempre: "Fuente: INEGI, Encuesta Intercensal". Detalles en eic://guia.""",
     website_url="https://github.com/zamax14/EIC-API-MCP",
 )
 
@@ -191,8 +198,11 @@ def brecha_genero(
 
 @mcp.tool(title="Evolución 2015 → 2025", annotations=SOLO_LECTURA)
 def evolucion_2015_2025(cve_ent: CveEnt = "00", tema: Tema = None) -> dict:
-    """Cambios entre la EIC 2015 y la 2025 para el país o una entidad, solo con indicadores equivalentes.
-    Incluye cambio absoluto y relativo, precisión de cada año y si los intervalos al 90 % se traslapan."""
+    """ÚNICA forma válida de comparar 2015 con 2025. Devuelve los indicadores equivalentes del país o una entidad
+    con cambio absoluto y relativo, precisión de cada año y si los intervalos al 90 % se traslapan.
+    Reglas: no compares indicadores que no estén en `items` (no armes pares por tu cuenta con obtener_datos);
+    los de `no_comparables` cambiaron de definición y no se reportan; si un indicador trae `advertencia`,
+    menciónala junto a la cifra."""
     return _q(queries.evolucion, cve_ent, tema)
 
 
@@ -400,8 +410,10 @@ def evolucion_prompt(
 
 1. Si no es "nacional", obtén su cve_ent con ubicar_lugar (los dos primeros dígitos del cvegeo); nacional = "00".
 2. Llama a evolucion_2015_2025 con ese cve_ent.
-3. Presenta una tabla por tema con el valor de 2015, el de 2025 y el cambio. Marca como "sin cambio claro"
-   los indicadores cuyos intervalos se traslapan, y para los de equivalencia "aproximada" menciona su nota.
+3. Presenta una tabla por tema con el valor de 2015, el de 2025 y el cambio, solo con los indicadores de
+   `items`. Marca como "sin cambio claro" los que tienen intervalos que se traslapan y escribe la
+   `advertencia` de cada indicador aproximado junto a su fila. No reportes los `no_comparables` ni armes
+   otros pares.
 4. Cierra con los 5 cambios más grandes y estadísticamente claros.""", "2015 y 2025")
 
 
