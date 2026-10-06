@@ -12,6 +12,8 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.prompts import Message
 from fastmcp.server.middleware import Middleware
+from fastmcp.server.middleware.caching import ResponseCachingMiddleware
+from key_value.aio.stores.memory import MemoryStore
 from mcp_types import PromptReference
 from pydantic import Field
 
@@ -85,6 +87,12 @@ class RegistroTools(Middleware):
 
 
 mcp.add_middleware(RegistroTools())
+# Los datos solo cambian con el ETL: cachear como nginx (10 min) ahorra la consulta a DuckDB en llamadas repetidas.
+# ponytail: caché en memoria por worker; si se escalan réplicas y baja la tasa de aciertos, pasar a Redis.
+mcp.add_middleware(ResponseCachingMiddleware(
+    cache_storage=MemoryStore(max_entries_per_collection=5000),
+    call_tool_settings={"ttl": 600}, read_resource_settings={"ttl": 600}, get_prompt_settings={"ttl": 600},
+))
 
 Dataset = Literal["eic2025_localidades", "eic2015_distritos"]
 Nivel = Literal["nacional", "entidad", "municipio", "localidad", "resto_localidades", "distrito"]
