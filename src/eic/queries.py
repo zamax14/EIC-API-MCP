@@ -108,8 +108,12 @@ def temas(ds: str) -> list[dict]:
 
 
 def indicadores(ds: str, tema: int | None = None, q: str | None = None) -> list[dict]:
-    sql = """SELECT i.codigo, i.nombre, i.descripcion, i.mnemonico_alt, i.tema_id, t.nombre AS tema
+    # comparable_2015_2025: exacta | aproximada | no_comparable | sin_equivalente (ver evolucion)
+    sql = """SELECT i.codigo, i.nombre, i.descripcion, i.mnemonico_alt, i.tema_id, t.nombre AS tema,
+                    coalesce(q.tipo, 'sin_equivalente') AS comparable_2015_2025
              FROM indicador i LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id
+             LEFT JOIN equivalencia q ON i.codigo = CASE i.dataset_id WHEN 'eic2015_distritos' THEN q.codigo_2015
+                                                                      ELSE q.codigo_2025 END
              WHERE i.dataset_id = ?"""
     params: list = [ds]
     if tema is not None:
@@ -156,7 +160,24 @@ def datos(ds: str, indicadores: list[str], cvegeo: list[str] | None = None, nive
         JOIN geografia g USING (dataset_id, cvegeo)
         JOIN indicador i ON i.dataset_id = e.dataset_id AND i.codigo = e.indicador
         WHERE e.dataset_id = ? AND e.indicador IN (SELECT unnest(?::VARCHAR[])){filtro}"""
-    return _page(sql, [ds, [i.upper() for i in indicadores], *params], "cvegeo, indicador", limit, offset)
+    codigos = [i.upper() for i in indicadores]
+    return _page(sql, [ds, codigos, *params], "cvegeo, indicador", limit, offset) | {
+        "comparabilidad_2015_2025": comparabilidad(ds, codigos)}
+
+
+AVISO_COMPARABILIDAD = ("Para comparar con el otro levantamiento usa solo evolucion_2015_2025 (o /evolucion). "
+                        "No emparejes por nombre los indicadores 'sin_equivalente' ni los 'no_comparable'.")
+
+
+def comparabilidad(ds: str, codigos: list[str]) -> dict:
+    """Estado de cada indicador frente al otro levantamiento: exacta, aproximada, no_comparable o sin_equivalente."""
+    propio, otro = ("codigo_2015", "codigo_2025") if ds == "eic2015_distritos" else ("codigo_2025", "codigo_2015")
+    pares = {r[propio]: r for r in _rows(f"""SELECT {propio}, {otro} AS contraparte, tipo AS estado, nota
+                                             FROM equivalencia WHERE {propio} IN (SELECT unnest(?::VARCHAR[]))""",
+                                         [codigos])}
+    return {"aviso": AVISO_COMPARABILIDAD,
+            "indicadores": {c: {k: v for k, v in pares[c].items() if k != propio} if c in pares
+                            else {"estado": "sin_equivalente"} for c in codigos}}
 
 
 # ---------- análisis ----------
