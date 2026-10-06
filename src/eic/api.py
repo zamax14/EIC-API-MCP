@@ -157,22 +157,26 @@ def get_equivalencias(formato: Formato = "json"):
 
 # ---------- descargas completas ----------
 
-def _parquet() -> pathlib.Path:
-    return pathlib.Path(os.environ.get("EIC_DB", "data/eic.duckdb")).parent / "parquet"
+TIPOS = {".csv": "text/csv; charset=utf-8", ".gz": "application/gzip", ".parquet": "application/vnd.apache.parquet"}
+
+
+def _descargas() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("EIC_DB", "data/eic.duckdb")).parent / "descargas"
 
 
 @app.get("/descargas")
 def get_descargas(request: Request):
-    """Tablas completas en Parquet, generadas por el ETL: pandas.read_parquet(url)."""
+    """Archivos completos generados por el ETL: CSV (ancho y largo por año, diccionario) y cada tabla en Parquet."""
     base = str(request.url_for("get_descarga", archivo="X")).removesuffix("/X")
-    return [{"tabla": f.stem, "url": f"{base}/{f.name}", "bytes": f.stat().st_size,
-             "pandas": f'pd.read_parquet("{base}/{f.name}")'} for f in sorted(_parquet().glob("*.parquet"))]
+    archivos = sorted((f for f in _descargas().iterdir() if f.suffix in TIPOS), key=lambda f: (f.suffix == ".parquet", f.name))
+    return [{"archivo": f.name, "url": f"{base}/{f.name}", "bytes": f.stat().st_size,
+             "pandas": f'pd.read_{"parquet" if f.suffix == ".parquet" else "csv"}("{base}/{f.name}")'} for f in archivos]
 
 
 @app.get("/descargas/{archivo}")
 def get_descarga(archivo: str):
-    ruta = _parquet() / archivo
+    ruta = _descargas() / archivo
     # solo nombres simples que existan en la carpeta: nada de rutas relativas
-    if pathlib.Path(archivo).name != archivo or ruta.suffix != ".parquet" or not ruta.is_file():
+    if pathlib.Path(archivo).name != archivo or ruta.suffix not in TIPOS or not ruta.is_file():
         raise HTTPException(404, f"archivo no encontrado: {archivo}")
-    return FileResponse(ruta, media_type="application/vnd.apache.parquet", filename=archivo)
+    return FileResponse(ruta, media_type=TIPOS[ruta.suffix], filename=archivo)
