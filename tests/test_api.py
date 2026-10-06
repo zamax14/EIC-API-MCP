@@ -69,4 +69,16 @@ assert comp["aviso"] and {k: v["estado"] for k, v in comp["indicadores"].items()
 assert {i["codigo"]: i["comparable_2015_2025"] for i in get("/datasets/eic2025_localidades/indicadores?q=agua entubada")}[
     "PCN_VPH_AGUADV"] == "no_comparable"
 assert c.get("/datasets/eic2025_localidades/ranking?indicador=POBTOT&n=101").status_code == 422
+# formatos para pandas: CSV en rutas tabulares y Parquet completo en /descargas
+r = c.get("/datasets/eic2025_localidades/datos?indicador=POBTOT,POBFEM&nivel=entidad&formato=csv")
+lineas = r.text.splitlines()
+assert r.headers["content-type"].startswith("text/csv") and len(lineas) == 65 and lineas[0].startswith("cvegeo,nombre")
+assert c.get("/evolucion?cve_ent=31&formato=csv").text.count("\n") == 34
+assert '"{""indigena""' in c.get("/datasets/eic2015_distritos/geografias?nivel=distrito&cve_ent=14&formato=csv").text
+assert c.get("/entidades?formato=xml").status_code == 422
+descargas = {d["tabla"]: d for d in get("/descargas")}
+assert {"estimacion", "geografia", "indicador", "equivalencia"} <= set(descargas)
+r = c.get("/descargas/geografia.parquet")
+assert r.status_code == 200 and r.content[:4] == b"PAR1" and len(r.content) == descargas["geografia"]["bytes"]
+assert all(c.get(f"/descargas/{x}").status_code == 404 for x in ["../eic.duckdb", "eic.duckdb", "nope.parquet"])
 print("ok")
