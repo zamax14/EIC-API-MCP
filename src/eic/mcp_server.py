@@ -5,11 +5,13 @@ stdio: python -m eic.mcp_server
 """
 
 import json
+import sys
 from typing import Annotated, Literal
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.prompts import Message
+from fastmcp.server.middleware import Middleware
 from mcp_types import PromptReference
 from pydantic import Field
 
@@ -72,6 +74,17 @@ de 2015 incluía el Seguro Popular).
 Cita siempre: "Fuente: INEGI, Encuesta Intercensal". Detalles en eic://guia.""",
     website_url="https://github.com/zamax14/EIC-API-MCP",
 )
+
+class RegistroTools(Middleware):
+    """Registra en stderr cada tool llamada y sus argumentos (los datos son públicos), para ver cómo la usan las IAs."""
+
+    async def on_call_tool(self, context, call_next):
+        print(f"[tool] {context.message.name} {json.dumps(context.message.arguments, ensure_ascii=False)}",
+              file=sys.stderr, flush=True)
+        return await call_next(context)
+
+
+mcp.add_middleware(RegistroTools())
 
 Dataset = Literal["eic2025_localidades", "eic2015_distritos"]
 Nivel = Literal["nacional", "entidad", "municipio", "localidad", "resto_localidades", "distrito"]
@@ -139,7 +152,9 @@ def obtener_datos(
     desplazamiento: Annotated[int, Field(ge=0)] = 0,
 ) -> dict:
     """Obtiene estimaciones crudas: valor, error estándar, límites de confianza al 90 %, CV, precisión y nota (MI/NA).
-    Filtra por cvegeo, por nivel y/o por cve_ent. Si total > limite, pagina con desplazamiento."""
+    Filtra por cvegeo, por nivel y/o por cve_ent. Si total > limite, pagina con desplazamiento.
+    No la uses para comparar 2015 con 2025: `comparabilidad_2015_2025` indica el estado de cada indicador y
+    esa comparación se hace solo con evolucion_2015_2025."""
     if not (cvegeo or nivel or cve_ent):
         raise ToolError("Indica al menos uno: cvegeo, nivel o cve_ent")
     return queries.datos(dataset, indicadores, cvegeo, nivel, cve_ent, limite, desplazamiento)
