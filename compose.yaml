@@ -30,8 +30,8 @@ services:
 
   mcp:
     build: .
-    command: ["uvicorn", "eic.mcp_server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2",
-              "--limit-concurrency", "32", "--timeout-keep-alive", "5", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    command: ["uvicorn", "eic.mcp_server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4",
+              "--limit-concurrency", "64", "--timeout-keep-alive", "5", "--proxy-headers", "--forwarded-allow-ips", "*"]
     depends_on:
       etl:
         condition: service_completed_successfully
@@ -40,8 +40,8 @@ services:
       EIC_DB_THREADS: ${EIC_DB_THREADS:-2}
     volumes:
       - eic-data:/app/data:ro
-    mem_limit: 1g
-    cpus: 2
+    mem_limit: 1600m
+    cpus: 4
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 3)"]
