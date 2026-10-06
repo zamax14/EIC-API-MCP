@@ -432,6 +432,27 @@ uv run python tests/test_etl.py && uv run python tests/test_api.py && uv run pyt
 
 Para agregar otro paquete de datos abiertos de INEGI, añade una entrada a `SOURCES` en [`src/eic/etl.py`](src/eic/etl.py) con su URL y su parser.
 
+### Pruebas de carga
+
+[`loadtest/k6.js`](loadtest/k6.js) simula usuarios que alternan una consulta a la API y una tool del MCP, con una rampa hasta 1000 usuarios. Con la pila levantada (`docker compose up -d`):
+
+```sh
+docker run --rm -u "$(id -u)" --network eic-api-mcp_default -p 127.0.0.1:5665:5665 \
+  -v "$PWD/loadtest:/scripts" -e BASE=nginx \
+  -e K6_WEB_DASHBOARD=true -e K6_WEB_DASHBOARD_EXPORT=/scripts/reporte-nginx.html \
+  grafana/k6 run --summary-trend-stats="avg,med,p(95),p(99),max" /scripts/k6.js
+```
+
+Las gráficas se ven en vivo en http://localhost:5665 y quedan en `loadtest/reporte-nginx.html`.
+
+| Variable | Valor por defecto | Uso |
+|---|---|---|
+| `BASE` | `directo` | `nginx` pasa por la caché y los límites por IP, como en producción. `directo` va a `api:8000` y `mcp:8000` |
+| `IPS` | una IP por usuario | Número de IPs de cliente simuladas. Con pocas, imita a muchos usuarios de un servicio de IA que salen por las mismas IPs |
+| `PAUSA` | `2` | Segundos promedio entre iteraciones de cada usuario; `0` para estrés puro |
+
+En modo `directo`, cada usuario mantiene su propia conexión abierta y `--limit-concurrency` de uvicorn cuenta conexiones, así que con cientos de usuarios responde 503. Para medir la ruta real usa `nginx`.
+
 ## 📄 Licencia, fuente y créditos
 
 Código bajo licencia [MIT](LICENSE).
