@@ -1,0 +1,4 @@
+# Agrega esta sección a ~/.codex/config.toml
+# (o ejecuta: codex mcp add eic --url https://eic.datzin.com.mx/mcp)
+[mcp_servers.eic]
+url = "https://eic.datzin.com.mx/mcp"

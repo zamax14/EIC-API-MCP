@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "eic": {
+      "type": "http",
+      "url": "https://eic.datzin.com.mx/mcp"
+    }
+  }
+}
