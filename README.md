@@ -306,7 +306,7 @@ erDiagram
     }
 ```
 
-El esquema completo está en [`src/eic/schema.sql`](src/eic/schema.sql). Los temas de 2015 se asignan con los mismos nombres que en 2025, y las equivalencias entre años son una tabla curada en [`src/eic/equivalencias.csv`](src/eic/equivalencias.csv): 33 pares comparables marcados como `exacta` o `aproximada` (con una advertencia cuando cambió algo de la definición) y 5 marcados como `no_comparable`, que la API y el MCP reportan aparte para que nadie los compare. El ETL también exporta cada tabla a Parquet en `data/parquet/`, por si prefieres analizar los datos con pandas, polars o DuckDB directamente.
+El esquema completo está en [`src/eic/schema.sql`](src/eic/schema.sql). Los temas de 2015 se asignan con los mismos nombres que en 2025, y las equivalencias entre años son una tabla curada en [`src/eic/equivalencias.csv`](src/eic/equivalencias.csv): 33 pares comparables marcados como `exacta` o `aproximada` (con una advertencia cuando cambió algo de la definición) y 5 marcados como `no_comparable`, que la API y el MCP reportan aparte para que nadie los compare. El ETL también publica en `data/descargas/` (servido en [`/api/descargas`](https://eic.datzin.com.mx/api/descargas)) los CSV listos para pandas y cada tabla del modelo en Parquet, para quien prefiera polars o DuckDB.
 
 ## 🧱 Arquitectura
 
