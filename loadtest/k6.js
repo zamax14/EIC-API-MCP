@@ -40,31 +40,38 @@ export const options = {
 };
 
 const azar = (xs) => xs[Math.floor(Math.random() * xs.length)];
-const entidad = () => String(1 + Math.floor(Math.random() * 32)).padStart(2, '0');
-const INDICADORES = ['POBTOT', 'PCN_PSINDER', 'PCN_VPH_INTER', 'PCN_PDESOCUP', 'PCN_P15YM_AN'];
-const LUGARES = ['Zapopan', 'Tijuana', 'Juárez, Chihuahua', 'CDMX', 'Mérida', 'Oaxaca', 'Monterrey', 'León'];
+
+// Todos los indicadores y municipios reales, para que casi ninguna llamada caiga en caché.
+export function setup() {
+  const ind = http.get(`${API}/datasets/${DS}/indicadores`).json().map((i) => i.codigo);
+  const mun = http.get(`${API}/datasets/${DS}/geografias?nivel=municipio&limit=10000`).json().items
+    .map((g) => ({ cvegeo: g.cvegeo, ent: g.cve_ent, texto: `${g.nombre}, ${g.nom_ent}` }));
+  return { ind, mun };
+}
 
 const PETICIONES_API = [
-  () => `/datasets/${DS}/datos?indicador=${azar(INDICADORES)}&nivel=municipio&cve_ent=${entidad()}`,
-  () => `/datasets/${DS}/ranking?indicador=${azar(INDICADORES)}&nivel=municipio&cve_ent=${entidad()}`,
-  () => `/datasets/${DS}/perfil/${entidad()}0000000`,
-  () => `/ubicar?q=${encodeURIComponent(azar(LUGARES))}`,
+  (d, m) => `/datasets/${DS}/datos?indicador=${azar(d.ind)}&cvegeo=${m.cvegeo}`,
+  (d, m) => `/datasets/${DS}/ranking?indicador=${azar(d.ind)}&nivel=municipio&cve_ent=${m.ent}`,
+  (d, m) => `/datasets/${DS}/perfil/${m.cvegeo}`,
+  (d, m) => `/ubicar?q=${encodeURIComponent(m.texto)}`,
 ];
 
 const TOOLS_MCP = [
-  () => ['ubicar_lugar', { texto: azar(LUGARES) }],
-  () => ['obtener_datos', { dataset: DS, indicadores: [azar(INDICADORES)], nivel: 'municipio', cve_ent: entidad() }],
-  () => ['ranking', { indicador: azar(INDICADORES), nivel: 'municipio', cve_ent: entidad() }],
+  (d, m) => ['ubicar_lugar', { texto: m.texto }],
+  (d, m) => ['obtener_datos', { dataset: DS, indicadores: [azar(d.ind)], cvegeo: [m.cvegeo] }],
+  (d, m) => ['ranking', { indicador: azar(d.ind), nivel: 'municipio', cve_ent: m.ent }],
+  (d, m) => ['perfil_lugar', { cvegeo: m.cvegeo }],
 ];
 
-export default function () {
+export default function (d) {
+  const lugar = azar(d.mun);
   const n = IPS ? (__VU % IPS) : __VU;
   const ip = { 'X-Forwarded-For': `198.18.${n >> 8}.${n & 255}` };  // rango de pruebas, fuera de las redes confiables
   const tags = { tipo: 'api' };
-  const r = http.get(API + azar(PETICIONES_API)(), { headers: ip, tags });
+  const r = http.get(API + azar(PETICIONES_API)(d, lugar), { headers: ip, tags });
   check(r, { 'api 200': (res) => res.status === 200 }, tags);
 
-  const [name, args] = azar(TOOLS_MCP)();
+  const [name, args] = azar(TOOLS_MCP)(d, lugar);
   const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
   const tagsMcp = { tipo: 'mcp', tool: name };
   const m = http.post(MCP, body, { headers: { ...ip, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }, tags: tagsMcp });
@@ -74,7 +81,7 @@ export default function () {
       const j = res.status === 200 ? res.json() : null;
       return !!j && !j.error && !j.result.isError;
     },
-  }, { tipo: 'mcp' });
+  }, { tipo: 'mcp', tool: name });
 
   if (PAUSA) sleep(PAUSA * (0.5 + Math.random()));
 }
