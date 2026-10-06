@@ -330,13 +330,15 @@ def sugerir_lugares(texto: str, limit: int = 20) -> list[str]:
 def sugerir(tabla: str, texto: str, limit: int = 50) -> list[str]:
     """Nombres de entidades, temas o indicadores ('CÓDIGO — nombre') que contienen el texto."""
     sql = {
-        "entidad": f"SELECT nombre AS v FROM entidad e WHERE cve_ent <> '00' AND {_texto('e.nombre')} ORDER BY cve_ent",
-        "tema": f"SELECT DISTINCT nombre AS v FROM tema t WHERE {_texto('t.nombre')} ORDER BY v",
+        "entidad": f"""SELECT nombre AS v FROM entidad e WHERE cve_ent <> '00' AND {_texto('e.nombre')}
+                       ORDER BY NOT starts_with(strip_accents(lower(nombre)), strip_accents(lower(?))), cve_ent""",
+        "tema": f"""SELECT DISTINCT nombre AS v FROM tema t WHERE {_texto('t.nombre')}
+                    ORDER BY NOT starts_with(strip_accents(lower(v)), strip_accents(lower(?))), v""",
         "indicador": f"""SELECT codigo || ' — ' || nombre AS v FROM indicador i
                          WHERE dataset_id = 'eic2025_localidades' AND ({_texto('i.codigo')} OR {_texto('i.nombre')})
-                         ORDER BY codigo""",
+                         ORDER BY NOT starts_with(lower(codigo), lower(?)), codigo""",
     }[tabla]
-    params = [texto, texto] if tabla == "indicador" else [texto]
+    params = [texto] * sql.count("?")  # el mismo texto filtra y ordena
     return [r["v"] for r in _rows(f"{sql} LIMIT ?", [*params, limit])]
 
 
