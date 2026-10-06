@@ -389,8 +389,8 @@ Las variables se definen en el entorno o en un archivo `.env` junto a `compose.y
 | Variable | Default | Qué controla |
 |---|---|---|
 | `EIC_PORT` | `8081` | Puerto local de nginx (solo en 127.0.0.1) |
-| `EIC_DB_MEMORY` | `384MB` | Memoria máxima de DuckDB por proceso |
-| `EIC_DB_THREADS` | `2` | Hilos de DuckDB por proceso |
+| `EIC_DB_MEMORY` | `256MB` | Memoria máxima de DuckDB por proceso |
+| `EIC_DB_THREADS` | `1` | Hilos de DuckDB por proceso |
 
 Los límites contra abuso están en [`deploy/nginx.conf`](deploy/nginx.conf) y en [`compose.yaml`](compose.yaml):
 
@@ -400,7 +400,7 @@ Los límites contra abuso están en [`deploy/nginx.conf`](deploy/nginx.conf) y e
 | nginx | Caché de 10 min para la API (los datos solo cambian con el ETL); solo GET en `/api` y cuerpo de 64 KB como máximo en `/mcp` |
 | API / MCP | Caché de 10 min de las respuestas del MCP en memoria; concurrencia acotada por worker, máximo 10 000 filas por página (500 en el MCP), parámetros validados y SQL siempre parametrizado |
 | DuckDB | Base en solo lectura con memoria e hilos limitados por proceso |
-| Contenedores | Memoria y CPU acotadas; usuario sin privilegios |
+| Contenedores | API y MCP con 2 workers cada uno; topes de CPU y memoria (API 2 CPU / 768 MB, MCP 2 CPU / 1 GB, nginx 0.5 CPU / 128 MB), medidos para ~100 usuarios simultáneos; logs rotados a 3 × 10 MB; usuario sin privilegios |
 
 Si cambias `deploy/nginx.conf`, aplica la configuración con `docker compose up -d --force-recreate nginx`.
 
