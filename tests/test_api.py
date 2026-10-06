@@ -61,5 +61,12 @@ assert {"PCN_VPH_AGUADV", "PROM_HNV"} <= {i["codigo_2025"] for i in e["no_compar
 assert all(i["razon"] and "valor_2025" not in i for i in e["no_comparables"])
 assert get("/ubicar?q=cdmx")[0]["cvegeo"] == "090000000"
 assert len(get("/equivalencias")) == 38
+
+# comparabilidad visible donde se eligen y se piden los datos
+comp = get("/datasets/eic2015_distritos/datos?indicador=IND_061,IND_077,IND_119&cvegeo=31000")["comparabilidad_2015_2025"]
+assert comp["aviso"] and {k: v["estado"] for k, v in comp["indicadores"].items()} == {
+    "IND_061": "no_comparable", "IND_077": "sin_equivalente", "IND_119": "aproximada"}
+assert {i["codigo"]: i["comparable_2015_2025"] for i in get("/datasets/eic2025_localidades/indicadores?q=agua entubada")}[
+    "PCN_VPH_AGUADV"] == "no_comparable"
 assert c.get("/datasets/eic2025_localidades/ranking?indicador=POBTOT&n=101").status_code == 422
 print("ok")
