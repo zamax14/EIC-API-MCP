@@ -18,6 +18,8 @@ import duckdb
 import httpx
 import pyarrow as pa
 
+from eic.queries import PRECISION
+
 DATA = Path("data")
 RAW = DATA / "raw"
 SCHEMA = Path(__file__).with_name("schema.sql")
@@ -228,6 +230,64 @@ def insert(con: duckdb.DuckDBPyConnection, table: str, rows: list[dict]) -> None
         con.unregister("_rows")
 
 
+# ---------- descargas para pandas ----------
+
+ARCHIVO = {"eic2025_localidades": "eic2025", "eic2015_distritos": "eic2015"}
+# Columnas de identificación del CSV ancho, antes de los indicadores.
+COLUMNAS_GEO = {
+    "eic2025_localidades": "g.cvegeo, g.nivel, g.nom_ent AS entidad, g.nom_mun AS municipio, g.nombre AS lugar",
+    "eic2015_distritos": """g.cvegeo, g.nivel, g.nom_ent AS entidad, g.nombre AS lugar,
+                            g.atributos->>'indigena' AS indigena, g.atributos->>'complejidad' AS complejidad""",
+}
+
+
+def _copiar(con: duckdb.DuckDBPyConnection, consulta: str, destino: Path, opciones: str) -> None:
+    con.execute(f"COPY ({consulta}) TO '{destino}.tmp' ({opciones})")
+    os.replace(f"{destino}.tmp", destino)  # la API sirve estos archivos: nunca a medio escribir
+    print(f"  {destino.name}")
+
+
+def exportar(con: duckdb.DuckDBPyConnection, carpeta: Path) -> None:
+    """Publica cada tabla en Parquet y, para pandas, un CSV ancho y uno largo por año más el diccionario."""
+    carpeta.mkdir(exist_ok=True)
+    for (t,) in con.execute("SELECT table_name FROM information_schema.tables").fetchall():
+        _copiar(con, f"SELECT * FROM {t}", carpeta / f"{t}.parquet", "FORMAT parquet")
+
+    for ds, nombre in ARCHIVO.items():
+        codigos = [c for (c,) in con.execute(
+            "SELECT codigo FROM indicador WHERE dataset_id = ? ORDER BY tema_id, codigo", [ds]).fetchall()]
+        columnas = ", ".join(f"'{c}'" for c in codigos)
+        # ancho: una fila por lugar, una columna por indicador (solo el valor)
+        _copiar(con, f"""
+            SELECT {COLUMNAS_GEO[ds]}, p.* EXCLUDE (cvegeo)
+            FROM (PIVOT (SELECT cvegeo, indicador, valor FROM estimacion WHERE dataset_id = '{ds}')
+                  ON indicador IN ({columnas}) USING first(valor) GROUP BY cvegeo) p
+            JOIN geografia g ON g.dataset_id = '{ds}' AND g.cvegeo = p.cvegeo
+            ORDER BY g.cvegeo""", carpeta / f"{nombre}.csv", "HEADER")
+        # largo: una fila por lugar e indicador, con su precisión estadística
+        _copiar(con, f"""
+            SELECT g.cvegeo, g.nivel, g.nom_ent AS entidad, g.nombre AS lugar, e.indicador,
+                   i.nombre AS indicador_nombre, t.nombre AS tema, e.valor, e.error_estandar, e.lim_inf, e.lim_sup,
+                   e.coef_var,
+                   -- una sola columna de texto, sin vacíos: la precisión o por qué no hay dato
+                   coalesce({PRECISION}, CASE e.nota WHEN 'MI' THEN 'sin dato (muestra insuficiente)'
+                                                      WHEN 'NA' THEN 'no aplica' END) AS precision
+            FROM estimacion e JOIN geografia g USING (dataset_id, cvegeo)
+            JOIN indicador i ON i.dataset_id = e.dataset_id AND i.codigo = e.indicador
+            LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id
+            WHERE e.dataset_id = '{ds}' ORDER BY g.cvegeo, i.tema_id, e.indicador""",
+                carpeta / f"{nombre}_completo.csv.gz", "HEADER, COMPRESSION gzip")
+
+    _copiar(con, """
+        SELECT i.dataset_id, i.codigo, i.nombre, t.nombre AS tema, i.descripcion,
+               coalesce(q.tipo, 'sin_equivalente') AS comparable_2015_2025,
+               CASE i.dataset_id WHEN 'eic2015_distritos' THEN q.codigo_2025 ELSE q.codigo_2015 END AS contraparte
+        FROM indicador i LEFT JOIN tema t ON t.dataset_id = i.dataset_id AND t.id = i.tema_id
+        LEFT JOIN equivalencia q ON i.codigo = CASE i.dataset_id WHEN 'eic2015_distritos' THEN q.codigo_2015
+                                                                 ELSE q.codigo_2025 END
+        ORDER BY i.dataset_id DESC, i.tema_id, i.codigo""", carpeta / "indicadores.csv", "HEADER")
+
+
 def run(db: Path, offline: bool) -> None:
     tmp = db.with_suffix(".tmp")
     tmp.unlink(missing_ok=True)
@@ -263,12 +323,7 @@ def run(db: Path, offline: bool) -> None:
     assert not huerfanas, f"equivalencias.csv apunta a códigos inexistentes: {huerfanas}"
     print(f"  equivalencia: {len(equivalencias)}")
 
-    parquet = db.parent / "parquet"
-    parquet.mkdir(exist_ok=True)
-    for (t,) in con.execute("SELECT table_name FROM information_schema.tables").fetchall():
-        destino = parquet / f"{t}.parquet"
-        con.execute(f"COPY {t} TO '{destino}.tmp' (FORMAT parquet)")
-        os.replace(f"{destino}.tmp", destino)  # la API sirve estos archivos: nunca a medio escribir
+    exportar(con, db.parent / "descargas")
     con.close()
     os.replace(tmp, db)  # swap atómico: quien lea la base nunca ve una carga a medias
     print(f"ok -> {db}")
