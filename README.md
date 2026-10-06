@@ -118,6 +118,9 @@ datos = (est.merge(geo, on=["dataset_id", "cvegeo"])
             .merge(ind, left_on=["dataset_id", "indicador"], right_on=["dataset_id", "codigo"]))
 ```
 
+> [!NOTE]
+> Si pandas responde `HTTP Error 403`, el proxy está bloqueando su user-agent por defecto (`Python-urllib`; Cloudflare lo hace con *Browser Integrity Check*). Pásale otro: `pd.read_csv(url, storage_options={"User-Agent": "pandas"})`; funciona igual en `read_parquet` y `read_json`.
+
 `read_parquet` requiere `pyarrow` (`pip install pandas pyarrow`). También sirve con polars o DuckDB:
 `duckdb.sql("SELECT * FROM 'https://eic.datzin.com.mx/api/descargas/estimacion.parquet' LIMIT 5")`.
 
