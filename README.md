@@ -86,46 +86,22 @@ Todas son `GET`.
 
 ### 🐼 Desde pandas
 
-> [!TIP]
-> En [`ejemplos/notebooks/`](ejemplos/) hay notebooks completos, con gráficas, que se abren en Google Colab con un clic.
-
-Las rutas que devuelven tablas aceptan `formato=csv`, así que cualquier consulta se carga en una línea:
-
 ```python
 import pandas as pd
 
-API = "https://eic.datzin.com.mx/api"
-
-# Población por entidad 2025. Las claves (cvegeo, cve_ent…) llevan ceros a la izquierda: léelas como texto
-df = pd.read_csv(f"{API}/datasets/eic2025_localidades/datos?indicador=POBTOT,PCN_VPH_INTER&nivel=entidad&formato=csv",
-                 dtype={"cvegeo": str})
-tabla = df.pivot(index="nombre", columns="indicador", values="valor")
-
-# Ranking, evolución 2015 → 2025, catálogos…
-pd.read_csv(f"{API}/datasets/eic2025_localidades/ranking?indicador=PCN_PSINDER&nivel=municipio&n=100&formato=csv")
-pd.read_csv(f"{API}/evolucion?cve_ent=31&formato=csv")
-pd.read_csv(f"{API}/datasets/eic2025_localidades/indicadores?formato=csv")
+df = pd.read_csv("https://eic.datzin.com.mx/api/descargas/eic2025.csv")           # una fila por lugar, una columna por indicador
+indicadores = pd.read_csv("https://eic.datzin.com.mx/api/descargas/indicadores.csv")  # qué significa cada columna
 ```
 
-Rutas con `formato=csv`: `datos`, `geografias`, `indicadores`, `temas`, `ranking`, `ubicar`, `evolucion`, `equivalencias` y `entidades`. `datos` y `geografias` se paginan con `limit` (hasta 10 000) y `offset`.
+| Archivo | Qué trae |
+|---|---|
+| [`eic2025.csv`](https://eic.datzin.com.mx/api/descargas/eic2025.csv) | 2,776 lugares (país, entidades, municipios y localidades de 50 000+ hab.) × 341 indicadores · 5 MB |
+| [`eic2015.csv`](https://eic.datzin.com.mx/api/descargas/eic2015.csv) | 333 lugares (país, entidades y distritos electorales) × 107 indicadores |
+| [`eic2025_completo.csv.gz`](https://eic.datzin.com.mx/api/descargas/eic2025_completo.csv.gz) | Una fila por lugar e indicador, con error estándar, límites al 90 % y `precision` (alta, moderada o baja) · 28 MB |
+| [`eic2015_completo.csv.gz`](https://eic.datzin.com.mx/api/descargas/eic2015_completo.csv.gz) | Lo mismo para 2015 |
+| [`indicadores.csv`](https://eic.datzin.com.mx/api/descargas/indicadores.csv) | Diccionario de ambos años, con su comparabilidad 2015 ↔ 2025 |
 
-¿Quieres **toda la base**? El ETL publica cada tabla en Parquet (la de estimaciones pesa ~14 MB). La lista con URLs está en [`/api/descargas`](https://eic.datzin.com.mx/api/descargas):
-
-```python
-base = "https://eic.datzin.com.mx/api/descargas"
-est = pd.read_parquet(f"{base}/estimacion.parquet")   # ~1 millón de filas, formato largo
-geo = pd.read_parquet(f"{base}/geografia.parquet")
-ind = pd.read_parquet(f"{base}/indicador.parquet")
-
-datos = (est.merge(geo, on=["dataset_id", "cvegeo"])
-            .merge(ind, left_on=["dataset_id", "indicador"], right_on=["dataset_id", "codigo"]))
-```
-
-> [!NOTE]
-> Si pandas responde `HTTP Error 403`, el proxy está bloqueando su user-agent por defecto (`Python-urllib`; Cloudflare lo hace con *Browser Integrity Check*). Pásale otro: `pd.read_csv(url, storage_options={"User-Agent": "pandas"})`; funciona igual en `read_parquet` y `read_json`.
-
-`read_parquet` requiere `pyarrow` (`pip install pandas pyarrow`). También sirve con polars o DuckDB:
-`duckdb.sql("SELECT * FROM 'https://eic.datzin.com.mx/api/descargas/estimacion.parquet' LIMIT 5")`.
+También puedes pedir cualquier consulta de la API como CSV agregando `formato=csv`, por ejemplo [`/api/evolucion?cve_ent=31&formato=csv`](https://eic.datzin.com.mx/api/evolucion?cve_ent=31&formato=csv). Ejemplos completos en [`ejemplos/notebooks/`](ejemplos/).
 
 ## 🤖 Conecta tu IA (MCP)
 

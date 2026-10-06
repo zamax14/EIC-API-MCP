@@ -4,15 +4,14 @@ Recursos para usar la [EIC API + MCP](../README.md) sin empezar desde cero.
 
 ## 📓 Notebooks
 
-Todos usan la API pública y se pueden abrir directo en Google Colab, sin instalar nada.
+Se abren en Google Colab sin instalar nada. Todo parte de un `pd.read_csv(url)`.
 
 | Notebook | Qué enseña | |
 |---|---|---|
-| [01_consultas_api](notebooks/01_consultas_api.ipynb) | Pasar de una pregunta a un DataFrame: catálogos, búsqueda de indicadores, datos con intervalos de confianza, rankings y perfiles | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/zamax14/EIC-API-MCP/blob/main/ejemplos/notebooks/01_consultas_api.ipynb) |
-| [02_base_completa_parquet](notebooks/02_base_completa_parquet.ipynb) | Descargar la base completa (~1 millón de estimaciones), unir tablas, medir la precisión municipal y consultar con DuckDB sobre la URL | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/zamax14/EIC-API-MCP/blob/main/ejemplos/notebooks/02_base_completa_parquet.ipynb) |
-| [03_evolucion_2015_2025](notebooks/03_evolucion_2015_2025.ipynb) | Comparar la Intercensal 2015 con la 2025 bien: equivalencias, advertencias, cambios estadísticamente claros y lo que no se debe comparar | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/zamax14/EIC-API-MCP/blob/main/ejemplos/notebooks/03_evolucion_2015_2025.ipynb) |
+| [01_inicio_rapido](notebooks/01_inicio_rapido.ipynb) | Cargar toda la EIC 2025 en un DataFrame, entender sus columnas, ordenar entidades, filtrar municipios y revisar la precisión de cada cifra | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/zamax14/EIC-API-MCP/blob/main/ejemplos/notebooks/01_inicio_rapido.ipynb) |
+| [02_2015_vs_2025](notebooks/02_2015_vs_2025.ipynb) | Qué cambió entre las dos encuestas, qué cambios son estadísticamente claros y qué no se debe comparar | [![Abrir en Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/zamax14/EIC-API-MCP/blob/main/ejemplos/notebooks/02_2015_vs_2025.ipynb) |
 
-En local: `pip install pandas pyarrow matplotlib duckdb jupyter` y abre la carpeta `notebooks/`.
+En local: `pip install pandas matplotlib jupyter`.
 
 ## 🤖 Configuración MCP
 
