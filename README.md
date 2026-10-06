@@ -79,7 +79,7 @@ Todas son `GET`.
 | `/api/datasets/{id}/perfil/{cvegeo}` | `indicador`, `tema`, `conjunto` (`destacados`/`vulnerabilidad`): el lugar junto a su entidad y el país |
 | `/api/datasets/{id}/comparar` | `cvegeo` (2 a 10, separados por coma), `indicador`, `tema` |
 | `/api/datasets/{id}/brecha-genero/{cvegeo}` | `tema`: indicadores de mujeres frente a hombres |
-| `/api/evolucion` | `cve_ent` (`00` = nacional), `tema`: cambios 2015 → 2025 con indicadores equivalentes |
+| `/api/evolucion` | `cve_ent` (`00` = nacional), `tema`: cambios 2015 → 2025 con indicadores equivalentes; los que cambiaron de definición vienen aparte en `no_comparables` |
 | `/api/equivalencias` | Pares curados de indicadores comparables entre 2015 y 2025 |
 
 `nivel` acepta `nacional`, `entidad`, `municipio`, `localidad`, `resto_localidades` o `distrito`. `tema` acepta el id o parte del nombre (`vivienda`, `educacion`).
@@ -287,7 +287,7 @@ erDiagram
     }
 ```
 
-El esquema completo está en [`src/eic/schema.sql`](src/eic/schema.sql). Los temas de 2015 se asignan con los mismos nombres que en 2025, y las equivalencias entre años son una tabla curada en [`src/eic/equivalencias.csv`](src/eic/equivalencias.csv): 29 pares marcados como `exacta` o `aproximada`, con una nota cuando cambió la definición. El ETL también exporta cada tabla a Parquet en `data/parquet/`, por si prefieres analizar los datos con pandas, polars o DuckDB directamente.
+El esquema completo está en [`src/eic/schema.sql`](src/eic/schema.sql). Los temas de 2015 se asignan con los mismos nombres que en 2025, y las equivalencias entre años son una tabla curada en [`src/eic/equivalencias.csv`](src/eic/equivalencias.csv): 33 pares comparables marcados como `exacta` o `aproximada` (con una advertencia cuando cambió algo de la definición) y 5 marcados como `no_comparable`, que la API y el MCP reportan aparte para que nadie los compare. El ETL también exporta cada tabla a Parquet en `data/parquet/`, por si prefieres analizar los datos con pandas, polars o DuckDB directamente.
 
 ## 🧱 Arquitectura
 
