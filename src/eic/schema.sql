@@ -66,7 +66,7 @@ CREATE TABLE estimacion (
 CREATE TABLE equivalencia (
     codigo_2015 VARCHAR NOT NULL,
     codigo_2025 VARCHAR NOT NULL,
-    tipo        VARCHAR NOT NULL CHECK (tipo IN ('exacta', 'aproximada')),
-    nota        VARCHAR,                -- por qué es aproximada
+    tipo        VARCHAR NOT NULL CHECK (tipo IN ('exacta', 'aproximada', 'no_comparable')),
+    nota        VARCHAR,                -- por qué es aproximada o no comparable
     PRIMARY KEY (codigo_2015, codigo_2025)
 );

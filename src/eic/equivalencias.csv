@@ -28,3 +28,12 @@ IND_126,PCN_P3YM_HLI,exacta,
 IND_127,PCN_P3HLINHE,exacta,
 IND_128,PCN_POB_AFRO,aproximada,La pregunta de autoadscripción cambió de redacción: 2025 pregunta por afromexicana o afrodescendiente.
 IND_141,PCN_POB_IND,exacta,
+IND_005,RAZON_DEP_TOT,exacta,
+IND_055,VIVPARHAB,exacta,
+IND_066,PCN_VPH_TVP,exacta,
+IND_072,PCN_VPH_SOLAR,exacta,
+IND_061,PCN_VPH_AGUADV,no_comparable,"2015 cuenta solo agua entubada dentro de la vivienda; 2025 incluye la que llega al patio o terreno. La diferencia refleja sobre todo el cambio de definición, no una mejora del servicio."
+IND_053,PROM_HNV,no_comparable,"Universos distintos: 2015 mide a mujeres de 15 a 49 años; 2025 a mujeres de 12 años y más."
+IND_054,PCN_HF,no_comparable,"Universos distintos: 2015 mide a mujeres de 15 a 49 años; 2025 a mujeres de 12 años y más."
+IND_121,PCN_PDER_IMSS,no_comparable,"Denominadores distintos: 2015 es porcentaje de toda la población; 2025 es porcentaje de la población afiliada."
+IND_122,PCN_PDER_ISTE,no_comparable,"Denominadores distintos: 2015 es porcentaje de toda la población; 2025 es porcentaje de la población afiliada."
