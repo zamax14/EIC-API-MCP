@@ -396,9 +396,9 @@ Los límites contra abuso están en [`deploy/nginx.conf`](deploy/nginx.conf) y e
 
 | Capa | Protección |
 |---|---|
-| nginx | 20 req/s por IP con ráfaga de 100 y 50 conexiones simultáneas por IP; lo que excede recibe `429` |
+| nginx | API: 20 req/s por IP con ráfaga de 100 y 50 conexiones simultáneas. MCP: 50 req/s por IP con ráfaga de 200 y 100 conexiones, porque los servicios de IA juntan a muchos usuarios en pocas IPs. Lo que excede recibe `429` |
 | nginx | Caché de 10 min para la API (los datos solo cambian con el ETL); solo GET en `/api` y cuerpo de 64 KB como máximo en `/mcp` |
-| API / MCP | Concurrencia acotada por worker, máximo 10 000 filas por página (500 en el MCP), parámetros validados y SQL siempre parametrizado |
+| API / MCP | Caché de 10 min de las respuestas del MCP en memoria; concurrencia acotada por worker, máximo 10 000 filas por página (500 en el MCP), parámetros validados y SQL siempre parametrizado |
 | DuckDB | Base en solo lectura con memoria e hilos limitados por proceso |
 | Contenedores | Memoria y CPU acotadas; usuario sin privilegios |
 
