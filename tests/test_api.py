@@ -76,9 +76,13 @@ assert r.headers["content-type"].startswith("text/csv") and len(lineas) == 65 an
 assert c.get("/evolucion?cve_ent=31&formato=csv").text.count("\n") == 34
 assert '"{""indigena""' in c.get("/datasets/eic2015_distritos/geografias?nivel=distrito&cve_ent=14&formato=csv").text
 assert c.get("/entidades?formato=xml").status_code == 422
-descargas = {d["tabla"]: d for d in get("/descargas")}
-assert {"estimacion", "geografia", "indicador", "equivalencia"} <= set(descargas)
+descargas = {d["archivo"]: d for d in get("/descargas")}
+assert {"eic2025.csv", "eic2015.csv", "eic2025_completo.csv.gz", "indicadores.csv", "estimacion.parquet"} <= set(descargas)
+assert descargas["eic2025.csv"]["pandas"].startswith("pd.read_csv(") and list(descargas)[-1].endswith(".parquet")
+r = c.get("/descargas/eic2025.csv")
+assert r.headers["content-type"].startswith("text/csv") and r.text.startswith("cvegeo,nivel,entidad,municipio,lugar,")
+assert c.get("/descargas/eic2025_completo.csv.gz").content[:2] == b"\x1f\x8b"  # gzip
 r = c.get("/descargas/geografia.parquet")
-assert r.status_code == 200 and r.content[:4] == b"PAR1" and len(r.content) == descargas["geografia"]["bytes"]
+assert r.status_code == 200 and r.content[:4] == b"PAR1" and len(r.content) == descargas["geografia.parquet"]["bytes"]
 assert all(c.get(f"/descargas/{x}").status_code == 404 for x in ["../eic.duckdb", "eic.duckdb", "nope.parquet"])
 print("ok")

@@ -1,6 +1,7 @@
 """Verifica la base generada por `python -m eic.etl`. Uso: python tests/test_etl.py"""
 
 import os
+import pathlib
 
 import duckdb
 
@@ -37,4 +38,11 @@ assert q("""SELECT b.valor / a.valor BETWEEN 1.0 AND 1.2 FROM equivalencia q
             JOIN estimacion a ON a.dataset_id = 'eic2015_distritos' AND a.cvegeo = '00000' AND a.indicador = q.codigo_2015
             JOIN estimacion b ON b.dataset_id = 'eic2025_localidades' AND b.cvegeo = '000000000' AND b.indicador = q.codigo_2025
             WHERE q.codigo_2025 = 'POBTOT'""") == [(True,)]  # la población creció, pero menos de 20 %
+# descargas para pandas: ancho (una fila por lugar) y largo (una fila por estimación)
+d = pathlib.Path(os.environ.get("EIC_DB", "data/eic.duckdb")).parent / "descargas"
+ancho = lambda f: con.execute(f"SELECT count(*), (SELECT count(*) FROM (DESCRIBE SELECT * FROM '{d / f}')) FROM '{d / f}'").fetchone()
+assert ancho("eic2025.csv") == (2776, 5 + 341) and ancho("eic2015.csv") == (333, 6 + 107)
+assert q(f"SELECT count(*), count(precision) FROM '{d}/eic2025_completo.csv.gz'") == [(946616, 946616)]
+assert q(f"SELECT count(*) FROM '{d}/eic2015_completo.csv.gz'") == [(35631,)]
+assert q(f"SELECT count(*) FROM '{d}/indicadores.csv'") == [(448,)]
 print("ok")
