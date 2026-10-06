@@ -4,3 +4,4 @@ eiege_eic_2015_csv/
 conjunto_de_datos_eic2025_105_csv/
 .venv/
 __pycache__/
+loadtest/*.html
