@@ -47,7 +47,8 @@ async def main():
         r = (await call("ranking", indicador="PCN_PSINDER", cve_ent="14", n=3)).structured_content
         assert len(r["items"]) == 3 and r["items"][0]["posicion"] == 1
         assert (await call("brecha_genero", cvegeo="000000000", tema="educacion")).structured_content["items"]
-        assert len((await call("evolucion_2015_2025", cve_ent="14")).structured_content["items"]) == 29
+        ev = (await call("evolucion_2015_2025", cve_ent="14")).structured_content
+        assert len(ev["items"]) == 33 and len(ev["no_comparables"]) == 5
 
         # errores legibles y validación del esquema
         for name, args in [("obtener_datos", {"dataset": "eic2025_localidades", "indicadores": ["POBTOT"]}),

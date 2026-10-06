@@ -52,9 +52,14 @@ g = next(i for i in b["items"] if i["base"] == "GRAPROES")
 assert g["diferencia_mujeres_menos_hombres"] == round(g["valor_mujeres"]["valor"] - g["valor_hombres"]["valor"], 2)
 
 e = get("/evolucion?cve_ent=14")
-assert e["entidad"] == "Jalisco" and len(e["items"]) == 29
+assert e["entidad"] == "Jalisco" and len(e["items"]) == 33 and e["como_leer"]
 assert all(i["valor_2015"] is not None and i["valor_2025"] is not None for i in e["items"])
+assert all((i["advertencia"] is not None) == (i["tipo"] == "aproximada") for i in e["items"])
+# lo que cambió de definición no se compara: va aparte, con su razón y sin valores
+assert "PCN_VPH_AGUADV" not in {i["codigo_2025"] for i in e["items"]}
+assert {"PCN_VPH_AGUADV", "PROM_HNV"} <= {i["codigo_2025"] for i in e["no_comparables"]}
+assert all(i["razon"] and "valor_2025" not in i for i in e["no_comparables"])
 assert get("/ubicar?q=cdmx")[0]["cvegeo"] == "090000000"
-assert len(get("/equivalencias")) == 29
+assert len(get("/equivalencias")) == 38
 assert c.get("/datasets/eic2025_localidades/ranking?indicador=POBTOT&n=101").status_code == 422
 print("ok")
