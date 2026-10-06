@@ -150,11 +150,7 @@ def perfil_lugar(
     tema: Tema = None,
 ) -> dict:
     """Ficha de un lugar: cada indicador con su valor, CV y precisión, junto a los de su entidad y el total nacional."""
-    if conjunto == "vulnerabilidad" and not indicadores and not tema:
-        if dataset != "eic2025_localidades":
-            raise ToolError("El conjunto 'vulnerabilidad' solo existe para eic2025_localidades")
-        indicadores = queries.VULNERABILIDAD
-    return _q(queries.perfil, dataset, cvegeo, indicadores, tema)
+    return _q(queries.perfil, dataset, cvegeo, indicadores, tema, conjunto)
 
 
 @mcp.tool(title="Comparar lugares", annotations=SOLO_LECTURA)

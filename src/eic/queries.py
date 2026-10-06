@@ -224,8 +224,14 @@ def ranking(ds: str, indicador: str, nivel: str, cve_ent: str | None = None, ord
             "unidades_con_dato": total, "referencias": refs, "items": items}
 
 
-def perfil(ds: str, cvegeo: str, indicadores: list[str] | None = None, tema: int | str | None = None) -> dict:
-    """Indicadores de un lugar junto a los de su entidad y el total nacional."""
+def perfil(ds: str, cvegeo: str, indicadores: list[str] | None = None, tema: int | str | None = None,
+           conjunto: str = "destacados") -> dict:
+    """Indicadores de un lugar junto a los de su entidad y el total nacional.
+    Sin indicadores ni tema usa el `conjunto`: destacados, o vulnerabilidad (solo 2025)."""
+    if conjunto == "vulnerabilidad" and not indicadores and not tema:
+        if ds != "eic2025_localidades":
+            raise ValueError("el conjunto 'vulnerabilidad' solo existe para eic2025_localidades")
+        indicadores = VULNERABILIDAD
     lugar = _geo(ds, cvegeo)
     refs = {"lugar": cvegeo}
     for r in _rows("""SELECT nivel, cvegeo FROM geografia WHERE dataset_id = ?
