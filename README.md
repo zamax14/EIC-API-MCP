@@ -84,6 +84,43 @@ Todas son `GET`.
 
 `nivel` acepta `nacional`, `entidad`, `municipio`, `localidad`, `resto_localidades` o `distrito`. `tema` acepta el id o parte del nombre (`vivienda`, `educacion`).
 
+### 🐼 Desde pandas
+
+Las rutas que devuelven tablas aceptan `formato=csv`, así que cualquier consulta se carga en una línea:
+
+```python
+import pandas as pd
+
+API = "https://eic.datzin.com.mx/api"
+
+# Población por entidad 2025 (las claves geográficas como texto, para no perder los ceros a la izquierda)
+df = pd.read_csv(f"{API}/datasets/eic2025_localidades/datos?indicador=POBTOT,PCN_VPH_INTER&nivel=entidad&formato=csv",
+                 dtype={"cvegeo": str})
+tabla = df.pivot(index="nombre", columns="indicador", values="valor")
+
+# Ranking, evolución 2015 → 2025, catálogos…
+pd.read_csv(f"{API}/datasets/eic2025_localidades/ranking?indicador=PCN_PSINDER&nivel=municipio&n=100&formato=csv")
+pd.read_csv(f"{API}/evolucion?cve_ent=31&formato=csv")
+pd.read_csv(f"{API}/datasets/eic2025_localidades/indicadores?formato=csv")
+```
+
+Rutas con `formato=csv`: `datos`, `geografias`, `indicadores`, `temas`, `ranking`, `ubicar`, `evolucion`, `equivalencias` y `entidades`. `datos` y `geografias` se paginan con `limit` (hasta 10 000) y `offset`.
+
+¿Quieres **toda la base**? El ETL publica cada tabla en Parquet (la de estimaciones pesa ~14 MB). La lista con URLs está en [`/api/descargas`](https://eic.datzin.com.mx/api/descargas):
+
+```python
+base = "https://eic.datzin.com.mx/api/descargas"
+est = pd.read_parquet(f"{base}/estimacion.parquet")   # ~1 millón de filas, formato largo
+geo = pd.read_parquet(f"{base}/geografia.parquet")
+ind = pd.read_parquet(f"{base}/indicador.parquet")
+
+datos = (est.merge(geo, on=["dataset_id", "cvegeo"])
+            .merge(ind, left_on=["dataset_id", "indicador"], right_on=["dataset_id", "codigo"]))
+```
+
+`read_parquet` requiere `pyarrow` (`pip install pandas pyarrow`). También sirve con polars o DuckDB:
+`duckdb.sql("SELECT * FROM 'https://eic.datzin.com.mx/api/descargas/estimacion.parquet' LIMIT 5")`.
+
 ## 🤖 Conecta tu IA (MCP)
 
 Usa la instancia pública `https://eic.datzin.com.mx/mcp`, o la URL de tu propia instancia si lo montas.
