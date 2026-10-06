@@ -86,6 +86,9 @@ Todas son `GET`.
 
 ### 🐼 Desde pandas
 
+> [!TIP]
+> En [`ejemplos/notebooks/`](ejemplos/) hay notebooks completos, con gráficas, que se abren en Google Colab con un clic.
+
 Las rutas que devuelven tablas aceptan `formato=csv`, así que cualquier consulta se carga en una línea:
 
 ```python
@@ -93,7 +96,7 @@ import pandas as pd
 
 API = "https://eic.datzin.com.mx/api"
 
-# Población por entidad 2025 (las claves geográficas como texto, para no perder los ceros a la izquierda)
+# Población por entidad 2025. Las claves (cvegeo, cve_ent…) llevan ceros a la izquierda: léelas como texto
 df = pd.read_csv(f"{API}/datasets/eic2025_localidades/datos?indicador=POBTOT,PCN_VPH_INTER&nivel=entidad&formato=csv",
                  dtype={"cvegeo": str})
 tabla = df.pivot(index="nombre", columns="indicador", values="valor")
@@ -126,7 +129,7 @@ datos = (est.merge(geo, on=["dataset_id", "cvegeo"])
 
 ## 🤖 Conecta tu IA (MCP)
 
-Usa la instancia pública `https://eic.datzin.com.mx/mcp`, o la URL de tu propia instancia si lo montas.
+Usa la instancia pública `https://eic.datzin.com.mx/mcp`, o la URL de tu propia instancia si lo montas. Hay archivos listos para copiar en [`ejemplos/mcp/`](ejemplos/mcp/).
 
 <details open>
 <summary><b>Cursor, Windsurf y clientes con soporte HTTP</b> (<code>mcp.json</code>)</summary>
