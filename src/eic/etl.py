@@ -266,7 +266,9 @@ def run(db: Path, offline: bool) -> None:
     parquet = db.parent / "parquet"
     parquet.mkdir(exist_ok=True)
     for (t,) in con.execute("SELECT table_name FROM information_schema.tables").fetchall():
-        con.execute(f"COPY {t} TO '{parquet / t}.parquet' (FORMAT parquet)")
+        destino = parquet / f"{t}.parquet"
+        con.execute(f"COPY {t} TO '{destino}.tmp' (FORMAT parquet)")
+        os.replace(f"{destino}.tmp", destino)  # la API sirve estos archivos: nunca a medio escribir
     con.close()
     os.replace(tmp, db)  # swap atómico: quien lea la base nunca ve una carga a medias
     print(f"ok -> {db}")
