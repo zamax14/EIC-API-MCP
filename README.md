@@ -33,6 +33,15 @@ curl "https://eic.datzin.com.mx/api/datasets/eic2025_localidades/indicadores?q=d
 
 # Busca una localidad y su clave geográfica
 curl "https://eic.datzin.com.mx/api/datasets/eic2025_localidades/geografias?nivel=localidad&q=tijuana"
+
+# Los 10 municipios de Jalisco con más población sin afiliación a servicios de salud
+curl "https://eic.datzin.com.mx/api/datasets/eic2025_localidades/ranking?indicador=PCN_PSINDER&nivel=municipio&cve_ent=14"
+
+# Ficha de Zapopan frente a Jalisco y el país, enfocada en carencias sociales
+curl "https://eic.datzin.com.mx/api/datasets/eic2025_localidades/perfil/141200000?conjunto=vulnerabilidad"
+
+# ¿Qué cambió en Jalisco entre 2015 y 2025?
+curl "https://eic.datzin.com.mx/api/evolucion?cve_ent=14"
 ```
 
 Cada estimación trae su precisión estadística:
@@ -65,8 +74,15 @@ Todas son `GET`.
 | `/api/datasets/{id}/indicadores` | `tema`, `q` |
 | `/api/datasets/{id}/geografias` | `nivel`, `cve_ent`, `q`, `limit`, `offset` |
 | `/api/datasets/{id}/datos` | `indicador` (obligatorio; varios separados por coma), `cvegeo`, `nivel`, `cve_ent`, `limit` (≤ 10 000), `offset` |
+| `/api/ubicar` | `q` (`Zapopan`, `Juárez, Chihuahua`, `CDMX`…), `dataset` |
+| `/api/datasets/{id}/ranking` | `indicador`, `nivel`, `cve_ent`, `orden` (`desc`/`asc`), `n` (≤ 100), `excluir_baja_precision` |
+| `/api/datasets/{id}/perfil/{cvegeo}` | `indicador`, `tema`, `conjunto` (`destacados`/`vulnerabilidad`): el lugar junto a su entidad y el país |
+| `/api/datasets/{id}/comparar` | `cvegeo` (2 a 10, separados por coma), `indicador`, `tema` |
+| `/api/datasets/{id}/brecha-genero/{cvegeo}` | `tema`: indicadores de mujeres frente a hombres |
+| `/api/evolucion` | `cve_ent` (`00` = nacional), `tema`: cambios 2015 → 2025 con indicadores equivalentes |
+| `/api/equivalencias` | Pares curados de indicadores comparables entre 2015 y 2025 |
 
-`nivel` acepta `nacional`, `entidad`, `municipio`, `localidad`, `resto_localidades` o `distrito`.
+`nivel` acepta `nacional`, `entidad`, `municipio`, `localidad`, `resto_localidades` o `distrito`. `tema` acepta el id o parte del nombre (`vivienda`, `educacion`).
 
 ## 🤖 Conecta tu IA (MCP)
 
@@ -127,6 +143,17 @@ claude mcp add --transport http eic https://eic.datzin.com.mx/mcp
 </details>
 
 <details>
+<summary><b>Codex</b> (<code>~/.codex/config.toml</code>)</summary>
+
+```toml
+[mcp_servers.eic]
+url = "https://eic.datzin.com.mx/mcp"
+```
+
+O desde la terminal: `codex mcp add eic --url https://eic.datzin.com.mx/mcp`
+</details>
+
+<details>
 <summary><b>ChatGPT</b></summary>
 
 1. Activa el modo desarrollador en Configuración → Aplicaciones y conectores → Configuración avanzada.
@@ -153,24 +180,79 @@ claude mcp add --transport http eic https://eic.datzin.com.mx/mcp
 
 | Tool | Qué hace |
 |---|---|
-| `listar_datasets` | Datasets disponibles con sus temas |
-| `buscar_indicadores` | Encuentra códigos de indicador por texto o tema |
-| `buscar_geografias` | Encuentra la clave `cvegeo` por nombre, nivel o entidad |
-| `obtener_datos` | Estimaciones con error estándar, límites al 90 %, CV, `precision` (criterio INEGI) y nota MI/NA |
+| `ubicar_lugar` | Convierte un nombre (`Zapopan`, `Juárez, Chihuahua`, `CDMX`) en su clave `cvegeo` |
+| `perfil_lugar` | Ficha de un lugar frente a su entidad y el país; indicadores destacados, de un tema o de vulnerabilidad social |
+| `comparar_lugares` | Tabla indicador × lugar para 2 a 10 lugares |
+| `ranking` | Los mayores o menores valores de un indicador en un nivel, opcionalmente dentro de una entidad |
+| `brecha_genero` | Indicadores de mujeres frente a hombres en un lugar |
+| `evolucion_2015_2025` | Cambios entre encuestas con indicadores equivalentes, indicando si la diferencia es estadísticamente clara |
+| `listar_datasets`, `buscar_indicadores`, `buscar_geografias`, `obtener_datos` | Exploración y datos crudos |
 
-Todas las tools son de solo lectura. El servidor le indica al modelo cómo leer la precisión de cada estimación, para que no presente como sólidas cifras con muestra insuficiente.
+Todas son de solo lectura. Cada cifra trae su `precision` según el criterio de INEGI, y el servidor le indica al modelo que no presente como sólidas las estimaciones con muestra insuficiente.
 
-Preguntas que puedes hacerle:
-- *¿Qué municipio de Jalisco tiene mayor porcentaje de hogares desplazados por inseguridad?*
-- *Compara los hogares afrodescendientes entre entidades en 2025.*
-- *¿Cuántos habitantes tiene Tijuana según la Intercensal 2025 y qué tan precisa es la estimación?*
+### Prompts (pre-consultas)
+
+Son análisis guiados que el cliente te ofrece con un formulario y autocompletado de lugares, temas e indicadores. En Claude Code aparecen como comandos `/mcp__eic__<prompt>`; en Claude Desktop, en el botón **+** → EIC. ChatGPT y Codex no muestran prompts, pero puedes pedirles lo mismo con tus palabras (ver ejemplos abajo).
+
+| Prompt | Argumentos | Qué hace |
+|---|---|---|
+| `guia_rapida` | | Explica qué datos hay y sugiere preguntas |
+| `perfil_lugar` | `lugar` | Perfil sociodemográfico frente a la entidad y el país |
+| `comparar_lugares` | `lugares` (separados por `;`), `tema` | Comparación lado a lado |
+| `ranking` | `indicador`, `nivel`, `entidad`, `orden` | Los lugares con valores más altos o más bajos |
+| `explorar_tema` | `tema`, `anio` | Qué mide un tema, panorama nacional y entidades extremas |
+| `brecha_genero` | `lugar`, `tema` | Diferencias entre mujeres y hombres |
+| `vulnerabilidad_social` | `lugar` | Carencias en salud, educación, alimentación, vivienda, empleo y desplazamiento |
+| `evolucion_2015_2025` | `entidad` | Qué cambió entre la Intercensal 2015 y la 2025 |
+| `ficha_distrito` | `entidad`, `distrito` | Perfil de un distrito electoral federal (2015) |
+
+### Resources
+
+| URI | Contenido |
+|---|---|
+| `eic://guia` | Guía metodológica: precisión, claves geográficas y comparabilidad |
+| `eic://datasets/{dataset}/diccionario` | Indicadores de cada dataset agrupados por tema |
+| `eic://equivalencias` | Pares de indicadores comparables entre 2015 y 2025 |
+| `eic://entidades` | Catálogo de entidades federativas |
+
+## 💬 Qué le puedes pedir a tu IA
+
+Con el conector activo, pregunta en lenguaje natural; la IA elige las tools. Funciona igual en ChatGPT, Claude, Codex o Claude Code.
+
+**Perfiles y comparaciones**
+- *Hazme el perfil sociodemográfico de Zapopan y compáralo con Jalisco y con el país.*
+- *Compara Monterrey, Guadalajara y Puebla en vivienda: drenaje, internet y hacinamiento.*
+- *¿Cómo es Tijuana frente al resto de Baja California en educación y empleo?*
+
+**Rankings**
+- *¿Cuáles son los 10 municipios de Oaxaca con mayor porcentaje de población sin afiliación a servicios de salud? Excluye las estimaciones poco precisas.*
+- *¿En qué estados es mayor el desplazamiento forzado por inseguridad?*
+- *¿Qué localidades de 50 mil habitantes o más tienen menos acceso a internet?*
+
+**Temas específicos**
+- *Hazme un diagnóstico de vulnerabilidad social de Ecatepec de Morelos.*
+- *¿Cuál es la brecha de género en escolaridad y participación económica en Chiapas?*
+- *Explícame qué mide la Intercensal 2025 sobre alimentación y dónde hay más hogares sin acceso a alimentos.*
+
+**2015 contra 2025**
+- *¿Qué cambió en Yucatán entre la Intercensal 2015 y la 2025? Solo dame los cambios estadísticamente claros.*
+- *¿Cuánto creció el acceso a internet en cada entidad desde 2015?*
+- *¿Qué distritos electorales de Chiapas eran indígenas en 2015 y cómo era su escolaridad?*
+
+**En Claude Code o Codex, combinando datos y código**
+- *Con el MCP eic, arma un CSV con el porcentaje de viviendas con internet por municipio de Jalisco y grafícalo con matplotlib.*
+- *Usa el MCP eic para generar un notebook que compare los 32 estados en los indicadores de vulnerabilidad social.*
+- *Con el prompt `/mcp__eic__perfil_lugar`, haz la ficha de Mérida y guárdala como `merida.md`.*
+
+> [!TIP]
+> En ChatGPT, activa el conector desde el menú de herramientas de la conversación o menciónalo: *"Usa EIC para…"*. Si la IA mezcla años, pídele explícitamente *"con la Intercensal 2025"*.
 
 ## 📊 Datos
 
 | Dataset | Fuente INEGI | Desagregación | Indicadores |
 |---|---|---|---|
 | `eic2025_localidades` | [EIC 2025](https://www.inegi.org.mx/programas/eic/2025/), principales resultados por localidad de 50 000 y más habitantes | Nacional, 32 entidades, 2,478 municipios, 233 localidades | 341 en 16 temas |
-| `eic2015_distritos` | [EIC 2015](https://www.inegi.org.mx/programas/intercensal/2015/), estadísticas a escalas geoelectorales | Nacional, 32 entidades, 300 distritos electorales federales | 107 |
+| `eic2015_distritos` | [EIC 2015](https://www.inegi.org.mx/programas/intercensal/2015/), estadísticas a escalas geoelectorales | Nacional, 32 entidades, 300 distritos electorales federales | 107 en 9 temas |
 
 > [!IMPORTANT]
 > Son **estimaciones por muestreo**. Según el criterio de INEGI, un coeficiente de variación (CV) menor a 15 indica precisión alta, de 15 a 30 moderada, y mayor a 30 baja.
@@ -191,6 +273,7 @@ erDiagram
     geografia ||--o{ estimacion : "de"
     indicador ||--o{ estimacion : mide
     entidad   ||--o{ geografia  : cve_ent
+    indicador ||--o{ equivalencia : "2015 ↔ 2025"
     estimacion {
         varchar dataset_id
         varchar cvegeo
@@ -204,7 +287,7 @@ erDiagram
     }
 ```
 
-El esquema completo está en [`src/eic/schema.sql`](src/eic/schema.sql). El ETL también exporta cada tabla a Parquet en `data/parquet/`, por si prefieres analizar los datos con pandas, polars o DuckDB directamente.
+El esquema completo está en [`src/eic/schema.sql`](src/eic/schema.sql). Los temas de 2015 se asignan con los mismos nombres que en 2025, y las equivalencias entre años son una tabla curada en [`src/eic/equivalencias.csv`](src/eic/equivalencias.csv): 29 pares marcados como `exacta` o `aproximada`, con una nota cuando cambió la definición. El ETL también exporta cada tabla a Parquet en `data/parquet/`, por si prefieres analizar los datos con pandas, polars o DuckDB directamente.
 
 ## 🧱 Arquitectura
 
